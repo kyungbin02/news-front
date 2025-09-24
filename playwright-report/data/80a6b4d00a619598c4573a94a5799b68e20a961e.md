@@ -1,0 +1,520 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e5]:
+      - button "로그인" [ref=e6]:
+        - img [ref=e7]
+        - text: 로그인
+      - button "회원가입" [ref=e9]:
+        - img [ref=e10]
+        - text: 회원가입
+      - link "MY 뉴스" [ref=e12] [cursor=pointer]:
+        - /url: /mypage
+        - img [ref=e13] [cursor=pointer]
+        - text: MY 뉴스
+      - link "고객센터" [ref=e15] [cursor=pointer]:
+        - /url: /customer
+        - img [ref=e16] [cursor=pointer]
+        - text: 고객센터
+    - generic [ref=e19]:
+      - generic [ref=e20]:
+        - link "뉴스포털" [ref=e21] [cursor=pointer]:
+          - /url: /
+        - list [ref=e22]:
+          - listitem [ref=e23]:
+            - link "경제" [ref=e24] [cursor=pointer]:
+              - /url: /economy
+          - listitem [ref=e25]:
+            - link "스포츠" [ref=e26] [cursor=pointer]:
+              - /url: /sports
+          - listitem [ref=e27]:
+            - link "IT" [ref=e28] [cursor=pointer]:
+              - /url: /it
+          - listitem [ref=e29]:
+            - link "칼럼" [ref=e30] [cursor=pointer]:
+              - /url: /column
+      - generic [ref=e31]:
+        - textbox "뉴스검색" [ref=e32]
+        - img [ref=e34]
+  - main [ref=e36]:
+    - generic [ref=e37]:
+      - generic [ref=e40]:
+        - img "[속보]구속기소 김건희 “가장 어두운 밤 달이 밝게 빛나듯, 진실 바라보며 견딜 것”" [ref=e42]
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - generic [ref=e49]: 🧠 뉴스 깊이 읽기
+            - heading "[속보]구속기소 김건희 “가장 어두운 밤 달이 밝게 빛나듯, 진실 바라보..." [level=1] [ref=e50]
+            - paragraph [ref=e51]: 윤석열 전 대통령 부인 김건희 여사가 29일 구속 상태로 재판에 넘겨진 가운데 “가장 어두운 밤에 달빛이 밝게 빛나듯이 저 역시 저의 진실과 마음을 바라보며 이 시간을 견디겠다”고...
+            - generic [ref=e52]:
+              - button "자세히 보기" [ref=e53]
+              - button "공유하기" [ref=e54]
+            - generic [ref=e55]:
+              - generic [ref=e56]: 📅 2025. 8. 29.
+              - generic [ref=e57]: 👁 15.2k
+              - generic [ref=e58]: 💬 234
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - heading "📰 최신 뉴스" [level=2] [ref=e61]:
+                - generic [ref=e62]: 📰
+                - text: 최신 뉴스
+              - generic [ref=e63]: LIVE
+            - generic [ref=e64]:
+              - generic [ref=e65] [cursor=pointer]:
+                - generic [ref=e66] [cursor=pointer]: "1"
+                - generic [ref=e67] [cursor=pointer]:
+                  - generic [ref=e68] [cursor=pointer]:
+                    - generic [ref=e69] [cursor=pointer]: 📰
+                    - generic [ref=e70] [cursor=pointer]: IT
+                  - heading "[속보]구속기소 김건희 “가장 어두운 밤 달이 밝게 빛나듯, 진실 바라보..." [level=3] [ref=e71] [cursor=pointer]
+                  - generic [ref=e72] [cursor=pointer]: 8월 29일 전
+              - generic [ref=e73] [cursor=pointer]:
+                - generic [ref=e74] [cursor=pointer]: "2"
+                - generic [ref=e75] [cursor=pointer]:
+                  - generic [ref=e76] [cursor=pointer]:
+                    - generic [ref=e77] [cursor=pointer]: 📰
+                    - generic [ref=e78] [cursor=pointer]: IT
+                  - heading "복근 사진 올렸다고…“중징계” 민원 받은 女역도선수" [level=3] [ref=e79] [cursor=pointer]
+                  - generic [ref=e80] [cursor=pointer]: 8월 29일 전
+              - generic [ref=e81] [cursor=pointer]:
+                - generic [ref=e82] [cursor=pointer]: "3"
+                - generic [ref=e83] [cursor=pointer]:
+                  - generic [ref=e84] [cursor=pointer]:
+                    - generic [ref=e85] [cursor=pointer]: 📰
+                    - generic [ref=e86] [cursor=pointer]: IT
+                  - heading "[속보]구속기소 김건희 “어두운 밤 달이 빛나듯, 진실 바라보며 견딜 것..." [level=3] [ref=e87] [cursor=pointer]
+                  - generic [ref=e88] [cursor=pointer]: 8월 29일 전
+              - generic [ref=e89] [cursor=pointer]:
+                - generic [ref=e90] [cursor=pointer]: "4"
+                - generic [ref=e91] [cursor=pointer]:
+                  - generic [ref=e92] [cursor=pointer]:
+                    - generic [ref=e93] [cursor=pointer]: 📰
+                    - generic [ref=e94] [cursor=pointer]: IT
+                  - heading "GS건설, ‘2025 기후산업국제박람회’서 무탄소 분산에너지 사업 공개" [level=3] [ref=e95] [cursor=pointer]
+                  - generic [ref=e96] [cursor=pointer]: 8월 29일 전
+              - generic [ref=e97] [cursor=pointer]:
+                - generic [ref=e98] [cursor=pointer]: "5"
+                - generic [ref=e99] [cursor=pointer]:
+                  - generic [ref=e100] [cursor=pointer]:
+                    - generic [ref=e101] [cursor=pointer]: 📰
+                    - generic [ref=e102] [cursor=pointer]: IT
+                  - heading "특검, ‘내란 방조’ 한덕수 前총리 불구속 기소" [level=3] [ref=e103] [cursor=pointer]
+                  - generic [ref=e104] [cursor=pointer]: 8월 29일 전
+            - button "더 많은 뉴스 보기 →" [ref=e106]
+      - generic [ref=e114]:
+        - generic [ref=e115]:
+          - generic [ref=e116]:
+            - generic [ref=e117]:
+              - generic [ref=e121]:
+                - textbox "뉴스 검색 (제목, 내용, 카테고리)..." [ref=e122]
+                - img [ref=e124]
+                - button [disabled] [ref=e127]:
+                  - img [ref=e128]
+              - generic [ref=e130]: 총 50개 기사 · 1/9 페이지
+            - generic [ref=e132]:
+              - heading "최신 뉴스" [level=2] [ref=e133]
+              - paragraph [ref=e134]: IT, 스포츠, 경제 등 다양한 분야의 최신 소식을 확인하세요
+          - generic [ref=e135]:
+            - link "1 [속보]구속기소 김건희 “가장 어두운 밤 달이 밝게 빛나듯, 진실 바라보며 견딜 것” 뉴스 [속보]구속기소 김건희 “가장 어두운 밤 달이 밝게 빛나듯, 진실 바라보며 견딜 것” 윤석열 전 대통령 부인 김건희 여사가 29일 구속 상태로 재판에 넘겨진 가운데 “가장 어두운 밤에 달빛이 밝게 빛나듯이 저 역시 저의 진실과 마음을 바라보며 이 시간을 견디겠다”고 밝혔다.윤 전 대통령 변호인단에 따르면 김 여사는 이날 김건희 특검팀(특별검사 민중기)의 구속 기소에 “제게 주어진 길을 외면하지 않고, 묵묵히 재판에 임하겠다”며 이같이 말했다... Backend News 8월 29일" [ref=e136] [cursor=pointer]:
+              - /url: /news/1760
+              - generic [ref=e137] [cursor=pointer]:
+                - generic [ref=e138] [cursor=pointer]:
+                  - generic [ref=e139] [cursor=pointer]: "1"
+                  - img "[속보]구속기소 김건희 “가장 어두운 밤 달이 밝게 빛나듯, 진실 바라보며 견딜 것”" [ref=e140] [cursor=pointer]
+                  - generic [ref=e142] [cursor=pointer]: 뉴스
+                - generic [ref=e143] [cursor=pointer]:
+                  - heading "[속보]구속기소 김건희 “가장 어두운 밤 달이 밝게 빛나듯, 진실 바라보며 견딜 것”" [level=3] [ref=e144] [cursor=pointer]
+                  - paragraph [ref=e145] [cursor=pointer]: 윤석열 전 대통령 부인 김건희 여사가 29일 구속 상태로 재판에 넘겨진 가운데 “가장 어두운 밤에 달빛이 밝게 빛나듯이 저 역시 저의 진실과 마음을 바라보며 이 시간을 견디겠다”고 밝혔다.윤 전 대통령 변호인단에 따르면 김 여사는 이날 김건희 특검팀(특별검사 민중기)의 구속 기소에 “제게 주어진 길을 외면하지 않고, 묵묵히 재판에 임하겠다”며 이같이 말했다...
+                  - generic [ref=e146] [cursor=pointer]:
+                    - generic [ref=e147] [cursor=pointer]:
+                      - img [ref=e149] [cursor=pointer]
+                      - generic [ref=e151] [cursor=pointer]: Backend News
+                    - generic [ref=e152] [cursor=pointer]:
+                      - img [ref=e153] [cursor=pointer]
+                      - generic [ref=e155] [cursor=pointer]: 8월 29일
+            - link "2 복근 사진 올렸다고…“중징계” 민원 받은 女역도선수 뉴스 복근 사진 올렸다고…“중징계” 민원 받은 女역도선수 포천시청 역도선수 박수민이 SNS에 복근 사진을 올렸다가 국민신문고에 중징계 민원이 접수됐다. 하지만 운동복 차림을 품위 유지 위반으로 보기는 어렵다는 반응이 많다.... Backend News 8월 29일" [ref=e156] [cursor=pointer]:
+              - /url: /news/1759
+              - generic [ref=e157] [cursor=pointer]:
+                - generic [ref=e158] [cursor=pointer]:
+                  - generic [ref=e159] [cursor=pointer]: "2"
+                  - img "복근 사진 올렸다고…“중징계” 민원 받은 女역도선수" [ref=e160] [cursor=pointer]
+                  - generic [ref=e162] [cursor=pointer]: 뉴스
+                - generic [ref=e163] [cursor=pointer]:
+                  - heading "복근 사진 올렸다고…“중징계” 민원 받은 女역도선수" [level=3] [ref=e164] [cursor=pointer]
+                  - paragraph [ref=e165] [cursor=pointer]: 포천시청 역도선수 박수민이 SNS에 복근 사진을 올렸다가 국민신문고에 중징계 민원이 접수됐다. 하지만 운동복 차림을 품위 유지 위반으로 보기는 어렵다는 반응이 많다....
+                  - generic [ref=e166] [cursor=pointer]:
+                    - generic [ref=e167] [cursor=pointer]:
+                      - img [ref=e169] [cursor=pointer]
+                      - generic [ref=e171] [cursor=pointer]: Backend News
+                    - generic [ref=e172] [cursor=pointer]:
+                      - img [ref=e173] [cursor=pointer]
+                      - generic [ref=e175] [cursor=pointer]: 8월 29일
+            - link "3 [속보]구속기소 김건희 “어두운 밤 달이 빛나듯, 진실 바라보며 견딜 것” 뉴스 [속보]구속기소 김건희 “어두운 밤 달이 빛나듯, 진실 바라보며 견딜 것” 구속기소 김건희 “어두운 밤 달이 빛나듯, 진실 바라보며 견딜 것”... Backend News 8월 29일" [ref=e176] [cursor=pointer]:
+              - /url: /news/1758
+              - generic [ref=e177] [cursor=pointer]:
+                - generic [ref=e178] [cursor=pointer]:
+                  - generic [ref=e179] [cursor=pointer]: "3"
+                  - img "[속보]구속기소 김건희 “어두운 밤 달이 빛나듯, 진실 바라보며 견딜 것”" [ref=e180] [cursor=pointer]
+                  - generic [ref=e182] [cursor=pointer]: 뉴스
+                - generic [ref=e183] [cursor=pointer]:
+                  - heading "[속보]구속기소 김건희 “어두운 밤 달이 빛나듯, 진실 바라보며 견딜 것”" [level=3] [ref=e184] [cursor=pointer]
+                  - paragraph [ref=e185] [cursor=pointer]: 구속기소 김건희 “어두운 밤 달이 빛나듯, 진실 바라보며 견딜 것”...
+                  - generic [ref=e186] [cursor=pointer]:
+                    - generic [ref=e187] [cursor=pointer]:
+                      - img [ref=e189] [cursor=pointer]
+                      - generic [ref=e191] [cursor=pointer]: Backend News
+                    - generic [ref=e192] [cursor=pointer]:
+                      - img [ref=e193] [cursor=pointer]
+                      - generic [ref=e195] [cursor=pointer]: 8월 29일
+            - link "4 GS건설, ‘2025 기후산업국제박람회’서 무탄소 분산에너지 사업 공개 경제 GS건설, ‘2025 기후산업국제박람회’서 무탄소 분산에너지 사업 공개 GS건설이 오는 8월 27일부터 사흘간 부산 벡스코에서 열리는 ‘2025 기후산업국제박람회(대한민국 에너지대전)’에서 무탄소 분산에너지 사업을 선보인다고 29일 밝혔다.GS건설은 미국 아모지(AMOGY)와 협력해 청정 암모니아 기반 수소엔진 발전기를 활용한 친환경 전기 생산 모델을 소개한다. 이번에 공개되는 발전기는 아모지의 특허 기술을 통해 암모니아에서 ... Backend News 8월 29일" [ref=e196] [cursor=pointer]:
+              - /url: /news/1757
+              - generic [ref=e197] [cursor=pointer]:
+                - generic [ref=e198] [cursor=pointer]:
+                  - generic [ref=e199] [cursor=pointer]: "4"
+                  - img "GS건설, ‘2025 기후산업국제박람회’서 무탄소 분산에너지 사업 공개" [ref=e200] [cursor=pointer]
+                  - generic [ref=e202] [cursor=pointer]: 경제
+                - generic [ref=e203] [cursor=pointer]:
+                  - heading "GS건설, ‘2025 기후산업국제박람회’서 무탄소 분산에너지 사업 공개" [level=3] [ref=e204] [cursor=pointer]
+                  - paragraph [ref=e205] [cursor=pointer]: GS건설이 오는 8월 27일부터 사흘간 부산 벡스코에서 열리는 ‘2025 기후산업국제박람회(대한민국 에너지대전)’에서 무탄소 분산에너지 사업을 선보인다고 29일 밝혔다.GS건설은 미국 아모지(AMOGY)와 협력해 청정 암모니아 기반 수소엔진 발전기를 활용한 친환경 전기 생산 모델을 소개한다. 이번에 공개되는 발전기는 아모지의 특허 기술을 통해 암모니아에서 ...
+                  - generic [ref=e206] [cursor=pointer]:
+                    - generic [ref=e207] [cursor=pointer]:
+                      - img [ref=e209] [cursor=pointer]
+                      - generic [ref=e211] [cursor=pointer]: Backend News
+                    - generic [ref=e212] [cursor=pointer]:
+                      - img [ref=e213] [cursor=pointer]
+                      - generic [ref=e215] [cursor=pointer]: 8월 29일
+            - link "5 특검, ‘내란 방조’ 한덕수 前총리 불구속 기소 뉴스 특검, ‘내란 방조’ 한덕수 前총리 불구속 기소 12·3 비상계엄 선포 사건을 수사 중인 내란 특검(특별검사 조은석)이 한덕수 전 국무총리를 29일 불구속 상태로 재판에 넘겼다.박지영 특검보는 브리핑을 통해 이날 오전 10시 30분경 한 전 총리를 내란 우두머리 방조, 위증, 허위공문서 작성·행사, 공용서류손상, 대통령기록물법 위반 혐의로 불구속 기소했다고 밝혔다.특검은 ‘국정 2인자’로서 대통령의 국가... Backend News 8월 29일" [ref=e216] [cursor=pointer]:
+              - /url: /news/1756
+              - generic [ref=e217] [cursor=pointer]:
+                - generic [ref=e218] [cursor=pointer]:
+                  - generic [ref=e219] [cursor=pointer]: "5"
+                  - img "특검, ‘내란 방조’ 한덕수 前총리 불구속 기소" [ref=e220] [cursor=pointer]
+                  - generic [ref=e222] [cursor=pointer]: 뉴스
+                - generic [ref=e223] [cursor=pointer]:
+                  - heading "특검, ‘내란 방조’ 한덕수 前총리 불구속 기소" [level=3] [ref=e224] [cursor=pointer]
+                  - paragraph [ref=e225] [cursor=pointer]: 12·3 비상계엄 선포 사건을 수사 중인 내란 특검(특별검사 조은석)이 한덕수 전 국무총리를 29일 불구속 상태로 재판에 넘겼다.박지영 특검보는 브리핑을 통해 이날 오전 10시 30분경 한 전 총리를 내란 우두머리 방조, 위증, 허위공문서 작성·행사, 공용서류손상, 대통령기록물법 위반 혐의로 불구속 기소했다고 밝혔다.특검은 ‘국정 2인자’로서 대통령의 국가...
+                  - generic [ref=e226] [cursor=pointer]:
+                    - generic [ref=e227] [cursor=pointer]:
+                      - img [ref=e229] [cursor=pointer]
+                      - generic [ref=e231] [cursor=pointer]: Backend News
+                    - generic [ref=e232] [cursor=pointer]:
+                      - img [ref=e233] [cursor=pointer]
+                      - generic [ref=e235] [cursor=pointer]: 8월 29일
+            - link "6 김건희 구속기소…전직 대통령 부부 첫 동시 재판 뉴스 김건희 구속기소…전직 대통령 부부 첫 동시 재판 김건희 특검팀(특별검사 민중기)은 29일 김건희 여사에 대해 자본시장법 위반, 정치자금법 위반 등의 혐의로 구속 기소했다고 밝혔다. 김 여사 구속은 특검팀이 지난달 2일 현판식을 열고 수사를 개시한 지 59일 만이다. 전직 대통령 부인이 구속 상태로 재판에 넘겨지는 건 김 여사가 처음이다. 또 역대 대통령 부부가 동시에 구속 상태로 재판받는 것도 처음이다.... Backend News 8월 29일" [ref=e236] [cursor=pointer]:
+              - /url: /news/1755
+              - generic [ref=e237] [cursor=pointer]:
+                - generic [ref=e238] [cursor=pointer]:
+                  - generic [ref=e239] [cursor=pointer]: "6"
+                  - img "김건희 구속기소…전직 대통령 부부 첫 동시 재판" [ref=e240] [cursor=pointer]
+                  - generic [ref=e242] [cursor=pointer]: 뉴스
+                - generic [ref=e243] [cursor=pointer]:
+                  - heading "김건희 구속기소…전직 대통령 부부 첫 동시 재판" [level=3] [ref=e244] [cursor=pointer]
+                  - paragraph [ref=e245] [cursor=pointer]: 김건희 특검팀(특별검사 민중기)은 29일 김건희 여사에 대해 자본시장법 위반, 정치자금법 위반 등의 혐의로 구속 기소했다고 밝혔다. 김 여사 구속은 특검팀이 지난달 2일 현판식을 열고 수사를 개시한 지 59일 만이다. 전직 대통령 부인이 구속 상태로 재판에 넘겨지는 건 김 여사가 처음이다. 또 역대 대통령 부부가 동시에 구속 상태로 재판받는 것도 처음이다....
+                  - generic [ref=e246] [cursor=pointer]:
+                    - generic [ref=e247] [cursor=pointer]:
+                      - img [ref=e249] [cursor=pointer]
+                      - generic [ref=e251] [cursor=pointer]: Backend News
+                    - generic [ref=e252] [cursor=pointer]:
+                      - img [ref=e253] [cursor=pointer]
+                      - generic [ref=e255] [cursor=pointer]: 8월 29일
+          - generic [ref=e256]:
+            - button "이전" [disabled] [ref=e257]
+            - button "1" [ref=e258]
+            - button "2" [ref=e259]
+            - button "3" [ref=e260]
+            - button "4" [ref=e261]
+            - button "5" [ref=e262]
+            - button "다음" [ref=e263]
+          - generic [ref=e264]:
+            - generic [ref=e265]:
+              - heading "🧠 AI 깊이 분석 뉴스" [level=2] [ref=e266]:
+                - generic [ref=e267]: 🧠
+                - text: AI 깊이 분석 뉴스
+              - link "더보기 →" [ref=e268] [cursor=pointer]:
+                - /url: /trending
+            - generic [ref=e269]:
+              - generic [ref=e270] [cursor=pointer]:
+                - generic [ref=e271] [cursor=pointer]: "1"
+                - generic [ref=e272] [cursor=pointer]:
+                  - heading "뉴스를 불러오는 중입니다" [level=3] [ref=e273] [cursor=pointer]
+                  - generic [ref=e274] [cursor=pointer]:
+                    - generic [ref=e275] [cursor=pointer]: 일반
+                    - generic [ref=e276] [cursor=pointer]: 방금 전
+                    - generic [ref=e277] [cursor=pointer]:
+                      - img [ref=e278] [cursor=pointer]
+                      - text: 분석도 90%
+              - generic [ref=e280] [cursor=pointer]:
+                - generic [ref=e281] [cursor=pointer]: "2"
+                - generic [ref=e282] [cursor=pointer]:
+                  - heading "잠시 후 다시 시도해주세요" [level=3] [ref=e283] [cursor=pointer]
+                  - generic [ref=e284] [cursor=pointer]:
+                    - generic [ref=e285] [cursor=pointer]: 일반
+                    - generic [ref=e286] [cursor=pointer]: 방금 전
+                    - generic [ref=e287] [cursor=pointer]:
+                      - img [ref=e288] [cursor=pointer]
+                      - text: 분석도 85%
+          - generic [ref=e290]:
+            - generic [ref=e291]:
+              - heading "🧠 AI 뉴스 분석 특징" [level=3] [ref=e292]:
+                - generic [ref=e293]: 🧠
+                - text: AI 뉴스 분석 특징
+              - generic [ref=e294]:
+                - generic [ref=e295]:
+                  - generic [ref=e296]: 🎯
+                  - generic [ref=e297]:
+                    - generic [ref=e298]:
+                      - heading "핵심 포인트 추출" [level=4] [ref=e299]
+                      - generic [ref=e300]: 95%
+                    - paragraph [ref=e301]: 뉴스의 가장 중요한 내용을 한눈에
+                - generic [ref=e302]:
+                  - generic [ref=e303]: 📚
+                  - generic [ref=e304]:
+                    - generic [ref=e305]:
+                      - heading "배경 & 맥락 분석" [level=4] [ref=e306]
+                      - generic [ref=e307]: 92%
+                    - paragraph [ref=e308]: 사건의 배경과 전후 맥락을 설명
+                - generic [ref=e309]:
+                  - generic [ref=e310]: 📈
+                  - generic [ref=e311]:
+                    - generic [ref=e312]:
+                      - heading "영향 & 전망 예측" [level=4] [ref=e313]
+                      - generic [ref=e314]: 89%
+                    - paragraph [ref=e315]: 뉴스가 미칠 영향과 향후 전망
+                - generic [ref=e316]:
+                  - generic [ref=e317]: 🏷️
+                  - generic [ref=e318]:
+                    - generic [ref=e319]:
+                      - heading "관련 키워드 추출" [level=4] [ref=e320]
+                      - generic [ref=e321]: 98%
+                    - paragraph [ref=e322]: 뉴스와 연관된 핵심 키워드 제공
+            - generic [ref=e323]:
+              - heading "💡 뉴스 깊이 읽기 가이드" [level=3] [ref=e324]:
+                - generic [ref=e325]: 💡
+                - text: 뉴스 깊이 읽기 가이드
+              - generic [ref=e326]:
+                - generic [ref=e327]:
+                  - generic [ref=e328]: "1"
+                  - generic [ref=e329]:
+                    - generic [ref=e330]:
+                      - generic [ref=e331]: 🧠
+                      - heading "AI 분석 결과 확인" [level=4] [ref=e332]
+                    - paragraph [ref=e333]: 핵심 포인트, 배경, 영향을 먼저 파악
+                - generic [ref=e334]:
+                  - generic [ref=e335]: "2"
+                  - generic [ref=e336]:
+                    - generic [ref=e337]:
+                      - generic [ref=e338]: 📖
+                      - heading "원문 내용 읽기" [level=4] [ref=e339]
+                    - paragraph [ref=e340]: AI 분석을 바탕으로 전체 기사 이해
+                - generic [ref=e341]:
+                  - generic [ref=e342]: "3"
+                  - generic [ref=e343]:
+                    - generic [ref=e344]:
+                      - generic [ref=e345]: 🔗
+                      - heading "관련 뉴스 연결" [level=4] [ref=e346]
+                    - paragraph [ref=e347]: 키워드로 연관 뉴스까지 확인
+              - paragraph [ref=e349]: "💡 팁: AI 분석을 먼저 읽으면 뉴스 이해도가 3배 향상됩니다!"
+          - generic [ref=e350]:
+            - heading "📈 트렌딩 토픽" [level=2] [ref=e351]:
+              - generic [ref=e352]: 📈
+              - text: 트렌딩 토픽
+            - generic [ref=e353]:
+              - generic [ref=e355] [cursor=pointer]:
+                - generic [ref=e356] [cursor=pointer]: 🤖
+                - heading "AI & 머신러닝" [level=3] [ref=e357] [cursor=pointer]
+                - paragraph [ref=e358] [cursor=pointer]: 인공지능 기술의 최신 동향과 산업 적용 사례
+                - generic [ref=e359] [cursor=pointer]:
+                  - generic [ref=e360] [cursor=pointer]: 156개 기사
+                  - img [ref=e362] [cursor=pointer]
+              - generic [ref=e365] [cursor=pointer]:
+                - generic [ref=e366] [cursor=pointer]: 🏆
+                - heading "스포츠 & 엔터테인먼트" [level=3] [ref=e367] [cursor=pointer]
+                - paragraph [ref=e368] [cursor=pointer]: 국내외 스포츠 소식과 엔터테인먼트 뉴스
+                - generic [ref=e369] [cursor=pointer]:
+                  - generic [ref=e370] [cursor=pointer]: 89개 기사
+                  - img [ref=e372] [cursor=pointer]
+              - generic [ref=e375] [cursor=pointer]:
+                - generic [ref=e376] [cursor=pointer]: 💰
+                - heading "경제 & 금융" [level=3] [ref=e377] [cursor=pointer]
+                - paragraph [ref=e378] [cursor=pointer]: 글로벌 경제 동향과 금융 시장 분석
+                - generic [ref=e379] [cursor=pointer]:
+                  - generic [ref=e380] [cursor=pointer]: 124개 기사
+                  - img [ref=e382] [cursor=pointer]
+          - generic [ref=e384]:
+            - generic [ref=e385]:
+              - heading "🎯 맞춤 뉴스 추천" [level=2] [ref=e386]:
+                - generic [ref=e387]: 🎯
+                - text: 맞춤 뉴스 추천
+              - paragraph [ref=e388]: 당신의 관심사에 맞는 뉴스를 추천해드립니다
+            - generic [ref=e389]:
+              - generic [ref=e390] [cursor=pointer]:
+                - generic [ref=e392] [cursor=pointer]: 💻
+                - heading "테크" [level=3] [ref=e393] [cursor=pointer]
+                - paragraph [ref=e394] [cursor=pointer]: 24개
+              - generic [ref=e395] [cursor=pointer]:
+                - generic [ref=e397] [cursor=pointer]: ⚽
+                - heading "스포츠" [level=3] [ref=e398] [cursor=pointer]
+                - paragraph [ref=e399] [cursor=pointer]: 18개
+              - generic [ref=e400] [cursor=pointer]:
+                - generic [ref=e402] [cursor=pointer]: 📊
+                - heading "경제" [level=3] [ref=e403] [cursor=pointer]
+                - paragraph [ref=e404] [cursor=pointer]: 31개
+              - generic [ref=e405] [cursor=pointer]:
+                - generic [ref=e407] [cursor=pointer]: 🎨
+                - heading "문화" [level=3] [ref=e408] [cursor=pointer]
+                - paragraph [ref=e409] [cursor=pointer]: 12개
+            - button "맞춤 설정하기" [ref=e411]
+        - generic [ref=e413]:
+          - generic [ref=e414]:
+            - generic [ref=e415]:
+              - generic [ref=e418]: 실시간 업데이트
+              - generic [ref=e419]: 오후 12:21
+            - generic [ref=e420]: 지금 가장 핫한 뉴스와 검색어를 확인하세요! 🔥
+          - generic [ref=e421]:
+            - generic [ref=e423]:
+              - heading "🔥 인기뉴스" [level=3] [ref=e424]:
+                - generic [ref=e425]: 🔥
+                - text: 인기뉴스
+              - generic [ref=e426]: 실시간
+            - generic [ref=e427]:
+              - link "엔비디아 성장세 둔화에… 다시 불거진 ‘AI 거품론’ 1 📰 general HOT 엔비디아 성장세 둔화에… 다시 불거진 ‘AI 거품론’ 4회 13분 전" [ref=e428] [cursor=pointer]:
+                - /url: /news/1746
+                - generic [ref=e429] [cursor=pointer]:
+                  - generic [ref=e430] [cursor=pointer]:
+                    - img "엔비디아 성장세 둔화에… 다시 불거진 ‘AI 거품론’" [ref=e431] [cursor=pointer]
+                    - generic [ref=e432] [cursor=pointer]: "1"
+                  - generic [ref=e433] [cursor=pointer]:
+                    - generic [ref=e434] [cursor=pointer]:
+                      - generic [ref=e435] [cursor=pointer]: 📰
+                      - generic [ref=e436] [cursor=pointer]: general
+                      - generic [ref=e437] [cursor=pointer]: HOT
+                    - heading "엔비디아 성장세 둔화에… 다시 불거진 ‘AI 거품론’" [level=4] [ref=e438] [cursor=pointer]
+                    - generic [ref=e439] [cursor=pointer]:
+                      - generic [ref=e440] [cursor=pointer]:
+                        - generic [ref=e441] [cursor=pointer]:
+                          - img [ref=e442] [cursor=pointer]
+                          - text: 4회
+                        - generic [ref=e445] [cursor=pointer]:
+                          - img [ref=e446] [cursor=pointer]
+                          - text: 13분 전
+                      - img [ref=e449] [cursor=pointer]
+              - link "서울창조경제혁신센터-카카오모빌리티, 우수 스타트업 발굴· 지원 MOU 체결 2 📰 general HOT 서울창조경제혁신센터-카카오모빌리티, 우수 스타트업 발굴· 지원 MOU 체결 2회 19분 전" [ref=e451] [cursor=pointer]:
+                - /url: /news/1729
+                - generic [ref=e452] [cursor=pointer]:
+                  - generic [ref=e453] [cursor=pointer]:
+                    - img "서울창조경제혁신센터-카카오모빌리티, 우수 스타트업 발굴· 지원 MOU 체결" [ref=e454] [cursor=pointer]
+                    - generic [ref=e455] [cursor=pointer]: "2"
+                  - generic [ref=e456] [cursor=pointer]:
+                    - generic [ref=e457] [cursor=pointer]:
+                      - generic [ref=e458] [cursor=pointer]: 📰
+                      - generic [ref=e459] [cursor=pointer]: general
+                      - generic [ref=e460] [cursor=pointer]: HOT
+                    - heading "서울창조경제혁신센터-카카오모빌리티, 우수 스타트업 발굴· 지원 MOU 체결" [level=4] [ref=e461] [cursor=pointer]
+                    - generic [ref=e462] [cursor=pointer]:
+                      - generic [ref=e463] [cursor=pointer]:
+                        - generic [ref=e464] [cursor=pointer]:
+                          - img [ref=e465] [cursor=pointer]
+                          - text: 2회
+                        - generic [ref=e468] [cursor=pointer]:
+                          - img [ref=e469] [cursor=pointer]
+                          - text: 19분 전
+                      - img [ref=e472] [cursor=pointer]
+              - link "젠슨 황 “AI 수요 폭발적”…삼성·SK도 ‘유폭’ 가능할까 3 📰 general HOT 젠슨 황 “AI 수요 폭발적”…삼성·SK도 ‘유폭’ 가능할까 2회 28분 전" [ref=e474] [cursor=pointer]:
+                - /url: /news/1733
+                - generic [ref=e475] [cursor=pointer]:
+                  - generic [ref=e476] [cursor=pointer]:
+                    - img "젠슨 황 “AI 수요 폭발적”…삼성·SK도 ‘유폭’ 가능할까" [ref=e477] [cursor=pointer]
+                    - generic [ref=e478] [cursor=pointer]: "3"
+                  - generic [ref=e479] [cursor=pointer]:
+                    - generic [ref=e480] [cursor=pointer]:
+                      - generic [ref=e481] [cursor=pointer]: 📰
+                      - generic [ref=e482] [cursor=pointer]: general
+                      - generic [ref=e483] [cursor=pointer]: HOT
+                    - heading "젠슨 황 “AI 수요 폭발적”…삼성·SK도 ‘유폭’ 가능할까" [level=4] [ref=e484] [cursor=pointer]
+                    - generic [ref=e485] [cursor=pointer]:
+                      - generic [ref=e486] [cursor=pointer]:
+                        - generic [ref=e487] [cursor=pointer]:
+                          - img [ref=e488] [cursor=pointer]
+                          - text: 2회
+                        - generic [ref=e491] [cursor=pointer]:
+                          - img [ref=e492] [cursor=pointer]
+                          - text: 28분 전
+                      - img [ref=e495] [cursor=pointer]
+              - link "‘못난 롯데’가 주는 위로… “그래도 버티며 이겨내자” 4 📰 general HOT ‘못난 롯데’가 주는 위로… “그래도 버티며 이겨내자” 2회 33분 전" [ref=e497] [cursor=pointer]:
+                - /url: /news/1641
+                - generic [ref=e498] [cursor=pointer]:
+                  - generic [ref=e499] [cursor=pointer]:
+                    - img "‘못난 롯데’가 주는 위로… “그래도 버티며 이겨내자”" [ref=e500] [cursor=pointer]
+                    - generic [ref=e501] [cursor=pointer]: "4"
+                  - generic [ref=e502] [cursor=pointer]:
+                    - generic [ref=e503] [cursor=pointer]:
+                      - generic [ref=e504] [cursor=pointer]: 📰
+                      - generic [ref=e505] [cursor=pointer]: general
+                      - generic [ref=e506] [cursor=pointer]: HOT
+                    - heading "‘못난 롯데’가 주는 위로… “그래도 버티며 이겨내자”" [level=4] [ref=e507] [cursor=pointer]
+                    - generic [ref=e508] [cursor=pointer]:
+                      - generic [ref=e509] [cursor=pointer]:
+                        - generic [ref=e510] [cursor=pointer]:
+                          - img [ref=e511] [cursor=pointer]
+                          - text: 2회
+                        - generic [ref=e514] [cursor=pointer]:
+                          - img [ref=e515] [cursor=pointer]
+                          - text: 33분 전
+                      - img [ref=e518] [cursor=pointer]
+            - button "더 많은 인기뉴스 보기 →" [ref=e521]
+          - generic [ref=e522]:
+            - generic [ref=e524]:
+              - heading "🔍 실시간 검색어" [level=3] [ref=e525]:
+                - generic [ref=e526]: 🔍
+                - text: 실시간 검색어
+              - generic [ref=e529]: LIVE
+            - generic [ref=e530]:
+              - generic [ref=e532] [cursor=pointer]:
+                - generic [ref=e533] [cursor=pointer]:
+                  - generic [ref=e534] [cursor=pointer]: "1"
+                  - generic [ref=e535] [cursor=pointer]: AI
+                - generic [ref=e536] [cursor=pointer]:
+                  - generic [ref=e537] [cursor=pointer]: 15회
+                  - generic [ref=e538] [cursor=pointer]: "-"
+                  - img [ref=e540] [cursor=pointer]
+              - generic [ref=e543] [cursor=pointer]:
+                - generic [ref=e544] [cursor=pointer]:
+                  - generic [ref=e545] [cursor=pointer]: "2"
+                  - generic [ref=e546] [cursor=pointer]: 테스트
+                - generic [ref=e547] [cursor=pointer]:
+                  - generic [ref=e548] [cursor=pointer]: 11회
+                  - generic [ref=e549] [cursor=pointer]: "-"
+                  - img [ref=e551] [cursor=pointer]
+            - generic [ref=e554]:
+              - generic [ref=e555]: 매 10초마다 업데이트
+              - generic [ref=e556]:
+                - img [ref=e557]
+                - text: 자동갱신
+          - generic [ref=e559]:
+            - generic [ref=e560]:
+              - generic [ref=e561]: 💡
+              - generic [ref=e562]: 오늘의 한줄
+            - paragraph [ref=e563]: "\"AI 시대, 변화에 적응하는 것이 생존의 열쇠다\""
+            - generic [ref=e564]: "- 테크 전문가 김OO"
+  - generic [ref=e567]:
+    - link "속보" [ref=e568] [cursor=pointer]:
+      - /url: /breaking
+      - img [ref=e569] [cursor=pointer]
+      - generic [ref=e571] [cursor=pointer]: 속보
+    - link "인기뉴스" [ref=e572] [cursor=pointer]:
+      - /url: /popular
+      - img [ref=e573] [cursor=pointer]
+      - generic [ref=e575] [cursor=pointer]: 인기뉴스
+    - link "영상뉴스" [ref=e576] [cursor=pointer]:
+      - /url: /videos
+      - img [ref=e577] [cursor=pointer]
+      - generic [ref=e580] [cursor=pointer]: 영상뉴스
+    - link "뉴스레터" [ref=e581] [cursor=pointer]:
+      - /url: /newsletter
+      - img [ref=e582] [cursor=pointer]
+      - generic [ref=e584] [cursor=pointer]: 뉴스레터
+  - alert [ref=e585]
+  - button "Open Next.js Dev Tools" [ref=e591] [cursor=pointer]:
+    - img [ref=e592] [cursor=pointer]
+```

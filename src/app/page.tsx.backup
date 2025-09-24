@@ -1,0 +1,1789 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { RSSArticle, fetchRSSNews } from '@/utils/rssApi';
+import { saveArticlesToStorage } from '@/utils/articleStorage';
+
+import { searchNews, searchNewsWithTracking, trackSearch, getPopularSearches } from '@/utils/searchApi';
+import { trackNewsClick } from '@/utils/newsClickApi';
+import { 
+  getAIAnalysisNews, 
+  getTrendingTopics, 
+  getAIFeatures, 
+  getReadingGuide, 
+  getPersonalizedRecommendations,
+  AIAnalysisItem,
+  TrendingTopic,
+  AIFeature,
+  ReadingGuide,
+  Recommendation
+} from '@/utils/dynamicContentApi';
+import SearchBar from "@/components/SearchBar";
+import Link from "next/link";
+
+export default function Home() {
+  const [news, setNews] = useState<RSSArticle[]>([]);
+  const [allNews, setAllNews] = useState<RSSArticle[]>([]); // Í≤Ä?âÏùÑ ?ÑÌïú ?ÑÏ≤¥ ?¥Ïä§
+  const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedNewsIndex, setSelectedNewsIndex] = useState(0); // ?†ÌÉù???¥Ïä§ ?∏Îç±??  const [searchKeyword, setSearchKeyword] = useState(''); // ?ÑÏû¨ Í≤Ä?âÏñ¥
+  const [scrollProgress, setScrollProgress] = useState(0); // ?§ÌÅ¨Î°?ÏßÑÌñâ??  
+  // ?ôÏ†Å ÏΩòÌÖêÏ∏??ÅÌÉú??  const [aiAnalysisNews, setAiAnalysisNews] = useState<AIAnalysisItem[]>([]);
+  const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
+  const [aiFeatures, setAiFeatures] = useState<AIFeature[]>([]);
+  const [readingGuide, setReadingGuide] = useState<ReadingGuide[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  
+  // ?∏Í∏∞?¥Ïä§ ?ÅÌÉú
+  const [mainPopularNews, setMainPopularNews] = useState<any>(null);
+  const [popularNewsList, setPopularNewsList] = useState<any[]>([]);
+  
+  // ?§ÏãúÍ∞?Í≤Ä?âÏñ¥ ?ÅÌÉú
+  const [searchKeywords, setSearchKeywords] = useState<any[]>([]);
+  
+  
+  const articlesPerPage = 8; // 4x2 Í∑∏Î¶¨??
+  // ?ÑÏû¨ ?†ÌÉù???¥Ïä§ Í∞Ä?∏Ïò§Í∏?  const selectedNews = news.length > 0 ? news[selectedNewsIndex] : null;
+  
+  // ?¥Ïä§ ?†ÌÉù ?∏Îì§??  const handleNewsSelect = (index: number) => {
+    setSelectedNewsIndex(index);
+  };
+
+  // ?¥Ïä§ ?¥Î¶≠ Ï∂îÏ†Å ?∏Îì§??  const handleNewsClick = async (article: RSSArticle | { id: string; title: string }) => {
+    try {
+      // Î∞±Í∑∏?ºÏö¥?úÏóê???¥Î¶≠ Ï∂îÏ†Å (?¨Ïö©??Í≤ΩÌóò???ÅÌñ• ?ÜÏù¥)
+      await trackNewsClick(article.id, article.title);
+      console.log(`?¥Ïä§ ?¥Î¶≠ Ï∂îÏ†Å?? ${article.title}`);
+    } catch (error) {
+      console.error('?¥Ïä§ ?¥Î¶≠ Ï∂îÏ†Å ?§Ìå®:', error);
+      // Ï∂îÏ†Å ?§Ìå®?¥ÎèÑ ?¨Ïö©???¥Îèô?Ä Í≥ÑÏÜç ÏßÑÌñâ
+    }
+  };
+
+  // Í≥µÏú†?òÍ∏∞ ?∏Îì§??  const handleShare = async (article?: RSSArticle | null) => {
+    const shareData = {
+      title: article ? article.title : "ÏµúÏã† ?¥Ïä§ - ?¥Ïä§ ?¨Ïù¥??,
+      text: article ? article.description || article.title : "?§Ïñë??ÏµúÏã† ?¥Ïä§Î•??ïÏù∏?¥Î≥¥?∏Ïöî",
+      url: article ? `${window.location.origin}/news/${article.id}` : window.location.href
+    };
+
+    try {
+      // Î∏åÎùº?∞Ï? Í≥µÏú† API ÏßÄ???¨Î? ?ïÏù∏
+      if (navigator.share) {
+        await navigator.share(shareData);
+        console.log('Í≥µÏú† ?±Í≥µ');
+      } else {
+        // Í≥µÏú† APIÎ•?ÏßÄ?êÌïòÏßÄ ?äÎäî Í≤ΩÏö∞ ?¥Î¶ΩÎ≥¥Îìú??Î≥µÏÇ¨
+        const shareText = `${shareData.title}\n${shareData.text}\n${shareData.url}`;
+        
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(shareData.url);
+          alert('ÎßÅÌÅ¨Í∞Ä ?¥Î¶ΩÎ≥¥Îìú??Î≥µÏÇ¨?òÏóà?µÎãà??');
+        } else {
+          // ?¥Î¶ΩÎ≥¥Îìú API??ÏßÄ?êÌïòÏßÄ ?äÎäî Í≤ΩÏö∞ ?òÎèô Î≥µÏÇ¨ ?àÎÇ¥
+          const textArea = document.createElement('textarea');
+          textArea.value = shareData.url;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          alert('ÎßÅÌÅ¨Í∞Ä ?¥Î¶ΩÎ≥¥Îìú??Î≥µÏÇ¨?òÏóà?µÎãà??');
+        }
+      }
+    } catch (error) {
+      console.error('Í≥µÏú† ?§Ìå®:', error);
+      // Í≥µÏú† ?§Ìå® ???¥Î¶ΩÎ≥¥Îìú Î≥µÏÇ¨Î°??ÄÏ≤?      try {
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(shareData.url);
+          alert('ÎßÅÌÅ¨Í∞Ä ?¥Î¶ΩÎ≥¥Îìú??Î≥µÏÇ¨?òÏóà?µÎãà??');
+        }
+      } catch (clipboardError) {
+        console.error('?¥Î¶ΩÎ≥¥Îìú Î≥µÏÇ¨???§Ìå®:', clipboardError);
+        alert('Í≥µÏú† Í∏∞Îä•???¨Ïö©?????ÜÏäµ?àÎã§. Î∏åÎùº?∞Ï?Î•??ÖÎç∞?¥Ìä∏??Ï£ºÏÑ∏??');
+      }
+    }
+  };
+
+  // ?∏Í∏∞?¥Ïä§ API ?∏Ï∂ú ?®Ïàò
+  const getMainPopularNews = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/news/popular?limit=1');
+      const data = await response.json();
+      if (data.success && data.data.length > 0) {
+        const popularNews = data.data[0];
+        
+        // ?¥Ïä§ ?ÅÏÑ∏ ?ïÎ≥¥Î•?Í∞Ä?∏Ï????¥Î?ÏßÄ URL Ï∂îÍ?
+        try {
+          const newsDetailResponse = await fetch(`http://localhost:8080/api/news/${popularNews.newsId}`);
+          const newsDetailData = await newsDetailResponse.json();
+          if (newsDetailData.success && newsDetailData.data) {
+            return {
+              ...popularNews,
+              imageUrl: newsDetailData.data.imageUrl || '/image/news.webp',
+              description: newsDetailData.data.description || popularNews.title
+            };
+          }
+        } catch (detailError) {
+          console.error('?¥Ïä§ ?ÅÏÑ∏ ?ïÎ≥¥ Î°úÎìú ?§Ìå®:', detailError);
+        }
+        
+        return {
+          ...popularNews,
+          imageUrl: '/image/news.webp',
+          description: popularNews.newsTitle || popularNews.title || `?¥Ïä§ #${popularNews.newsId}`
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Î©îÏù∏ ?∏Í∏∞?¥Ïä§ Î°úÎìú ?§Ìå®:', error);
+      return null;
+    }
+  };
+
+  const getPopularNewsList = async () => {
+    try {
+      const response = await fetch('http://localhost:8080/api/news/popular?limit=5');
+      const data = await response.json();
+      if (data.success && data.data.length > 0) {
+        return data.data;
+      }
+      return [];
+    } catch (error) {
+      console.error('?∏Í∏∞?¥Ïä§ Î™©Î°ù Î°úÎìú ?§Ìå®:', error);
+      return [];
+    }
+  };
+
+  // ?§ÏãúÍ∞?Í≤Ä?âÏñ¥ Î∂àÎü¨?§Í∏∞
+  const loadSearchKeywords = async () => {
+    try {
+      const keywords = await getPopularSearches(5);
+      setSearchKeywords(keywords);
+    } catch (error) {
+      console.error('?§ÏãúÍ∞?Í≤Ä?âÏñ¥ Î°úÎìú ?§Ìå®:', error);
+    }
+  };
+
+  // Í≤Ä???∏Îì§??  const handleSearch = async (keyword: string) => {
+    setSearchKeyword(keyword);
+    setCurrentPage(1); // Í≤Ä????Ï≤??òÏù¥ÏßÄÎ°??¥Îèô
+    
+    if (keyword.trim() === '') {
+      // Í≤Ä?âÏñ¥Í∞Ä ?ÜÏúºÎ©??ÑÏ≤¥ ?¥Ïä§ ?úÏãú
+      setNews(allNews);
+      setTotalPages(Math.ceil(allNews.length / articlesPerPage));
+    } else {
+      try {
+        // Í≤Ä?âÏñ¥ Ï∂îÏ†Å
+        await trackSearch(keyword);
+        
+        // ?§ÏãúÍ∞?Í≤Ä?âÏñ¥ ?ÖÎç∞?¥Ìä∏
+        await loadSearchKeywords();
+        
+        // Î∞±Ïóî?úÏóê??Í≤Ä???§Ìñâ
+        const searchResults = await searchNewsWithTracking(keyword);
+        
+        if (searchResults.length > 0) {
+          // Î∞±Ïóî??Í≤Ä??Í≤∞Í≥ºÍ∞Ä ?àÏúºÎ©??¨Ïö©
+          setNews(searchResults);
+          setTotalPages(Math.ceil(searchResults.length / articlesPerPage));
+        } else {
+          // Î∞±Ïóî??Í≤Ä??Í≤∞Í≥ºÍ∞Ä ?ÜÏúºÎ©?Î°úÏª¨ Í≤Ä?âÏúºÎ°?fallback
+          const localResults = searchNews(keyword, allNews);
+          setNews(localResults);
+          setTotalPages(Math.ceil(localResults.length / articlesPerPage));
+        }
+      } catch (error) {
+        console.error('Search failed:', error);
+        // ?êÎü¨ ??Î°úÏª¨ Í≤Ä?âÏúºÎ°?fallback
+        const localResults = searchNews(keyword, allNews);
+        setNews(localResults);
+        setTotalPages(Math.ceil(localResults.length / articlesPerPage));
+      }
+    }
+  };
+
+  // IT Ïπ¥ÌÖåÍ≥†Î¶¨ Î∞∞ÎÑà ?ïÎ≥¥
+  const categoryBanner = {
+      title: "?îÏ????ÑÍ∏∞??Ï≤òÌïú ?∏Í≥Ñ, IT Ï¥àÍ∞ï?ÄÍµ?ì§???Ä??,
+      description: "?îÏ??∏ÏÉÅ??Î™®Îì† ?ïÎ≥¥Î•??µÏ†ú?????àÎäî ?úÏû• Ï°∞Ïö∞??Î¨¥Í∏∞Î°??∏Ìï¥ ???∏Í≥Ñ Íµ???Ä Ï°∞ÏßÅ??Í∏∞Îä•??ÎßàÎπÑ?òÍ≥†, ?∏Î•ò ?ÑÏ≤¥Í∞Ä ?ÑÌòëÎ∞õÎäî Í±?Ï≤¥Í∞êÎ™ÖÏùò ?ÑÍ∏∞Í∞Ä Ï∞æÏïÑ?®Îã§. ?¥Î? ÎßâÏùÑ ???àÎäî Í±??§ÏßÅ Ï°¥Ïû¨ ?êÏ≤¥Í∞Ä Í∏∞Î???'?êÎã® ?åÌä∏'?Ä...",
+      category: "Í∏∞Ïà†"
+  };
+
+  // ?§ÌÅ¨Î°?ÏßÑÌñâ??Ï∂îÏ†Å
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.scrollHeight;
+      
+      // ?§ÌÅ¨Î°?ÏßÑÌñâ?ÑÎ? 0-1 ?¨Ïù¥Î°?Í≥ÑÏÇ∞ (Ï≤??îÎ©¥ ?íÏù¥ Í∏∞Ï?)
+      const progress = Math.min(scrollTop / windowHeight, 1);
+      setScrollProgress(progress);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const loadNews = async () => {
+      console.log('Starting to load mixed category news...');
+      setLoading(true);
+      try {
+        // Î∞±Ïóî?úÏóê???¥Ïä§ Í∞Ä?∏Ïò§Í∏?(?∞ÏÑ† ?úÎèÑ)
+        try {
+          const response = await fetch('http://localhost:8080/api/news?page=1&size=50', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            mode: 'cors',
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data && data.data.length > 0) {
+              // Î∞±Ïóî???∞Ïù¥?∞Î? ?ÑÎ°†?∏Ïóî???ïÏãù?ºÎ°ú Î≥Ä??(?†Ìö®???∞Ïù¥?∞Îßå)
+              const backendNews = data.data
+                .filter((news: any) => news.title) // titleÎß?Ï≤¥ÌÅ¨ (newsId???òÏ§ë???ùÏÑ±)
+                .map((news: any, index: number) => ({
+                  id: news.newsId ? news.newsId.toString() : `backend-${index}`,
+                  title: news.title,
+                  description: (news.content || '').substring(0, 200) + '...',
+                  link: `/news/${news.newsId || `backend-${index}`}`,
+                  category: news.category || 'general',
+                  source: 'Backend News',
+                  imageUrl: news.imageUrl || '/image/news.webp', // Í∏∞Î≥∏ ?¥Î?ÏßÄ ?§Ï†ï
+                  pubDate: news.createdAt || new Date().toISOString()
+                }));
+              
+              console.log('Loaded news from backend:', backendNews.length);
+              console.log('First news item:', backendNews[0]);
+              
+              // ?†Ìö®???¥Ïä§Í∞Ä ?àÏùÑ ?åÎßå ?¨Ïö©
+              if (backendNews.length > 0) {
+                console.log('Setting news state with backend data');
+                setNews(backendNews);
+                setAllNews(backendNews);
+                
+                const totalPages = Math.ceil(backendNews.length / articlesPerPage);
+                setTotalPages(totalPages);
+                setCurrentPage(1);
+                
+                saveArticlesToStorage(backendNews);
+                setLoading(false); // Î°úÎî© ?ÑÎ£å
+                return; // Î∞±Ïóî???±Í≥µ ??RSS??Í±¥ÎÑà?∞Í∏∞
+              } else {
+                console.log('No valid news from backend, using RSS fallback');
+              }
+            }
+          }
+        } catch (backendError) {
+          console.error('Backend failed, trying RSS fallback:', backendError);
+        }
+        
+        // Î∞±Ïóî???§Ìå® ??RSS fallback
+        console.log('Using RSS fallback...');
+        const [itNews, sportsNews, economyNews] = await Promise.all([
+          fetchRSSNews('it', 8),
+          fetchRSSNews('sports', 6),
+          fetchRSSNews('economy', 6)
+        ]);
+        
+        const allNews = [...itNews, ...sportsNews, ...economyNews]
+          .sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
+        
+        console.log('Loaded news from RSS fallback:', allNews.length);
+        setNews(allNews);
+        setAllNews(allNews);
+        
+        const totalPages = Math.ceil(allNews.length / articlesPerPage);
+        setTotalPages(totalPages);
+        setCurrentPage(1);
+        
+        saveArticlesToStorage(allNews);
+      } catch (error) {
+        console.error('Error in loadNews:', error);
+      }
+      setLoading(false);
+    };
+
+    loadNews();
+  }, []);
+
+  // ?∏Í∏∞?¥Ïä§ Î∞??§ÏãúÍ∞?Í≤Ä?âÏñ¥ Î°úÎìú
+  useEffect(() => {
+    const loadPopularNews = async () => {
+      try {
+        const [mainPopular, popularList, keywords] = await Promise.all([
+          getMainPopularNews(),
+          getPopularNewsList(),
+          getPopularSearches(5)
+        ]);
+        
+        setMainPopularNews(mainPopular);
+        setPopularNewsList(popularList);
+        setSearchKeywords(keywords);
+        console.log('?∏Í∏∞?¥Ïä§ Î∞??§ÏãúÍ∞?Í≤Ä?âÏñ¥ Î°úÎìú ?ÑÎ£å:', { mainPopular, popularList, keywords });
+      } catch (error) {
+        console.error('?∏Í∏∞?¥Ïä§ Î∞??§ÏãúÍ∞?Í≤Ä?âÏñ¥ Î°úÎìú ?§Ìå®:', error);
+      }
+    };
+
+    // Î©îÏù∏ ?¥Ïä§ Î°úÎìú ???∏Í∏∞?¥Ïä§ Î∞??§ÏãúÍ∞?Í≤Ä?âÏñ¥ Î°úÎìú
+    if (!loading) {
+      loadPopularNews();
+    }
+  }, [loading]);
+
+  // ?ôÏ†Å ÏΩòÌÖêÏ∏?Î°úÎìú (Î©îÏù∏ ?¥Ïä§ Î°úÎî©Í≥??®Íªò)
+  useEffect(() => {
+    const loadDynamicContent = async () => {
+      try {
+        const [analysisNews, topics, features, guide, recs] = await Promise.all([
+          getAIAnalysisNews(),
+          getTrendingTopics(),
+          getAIFeatures(),
+          getReadingGuide(),
+          getPersonalizedRecommendations()
+        ]);
+
+        setAiAnalysisNews(analysisNews);
+        setTrendingTopics(topics);
+        setAiFeatures(features);
+        setReadingGuide(guide);
+        setRecommendations(recs);
+      } catch (error) {
+        console.error('Failed to load dynamic content:', error);
+      }
+    };
+
+    // Î©îÏù∏ ?¥Ïä§Í∞Ä Î°úÎìú?????ôÏ†Å ÏΩòÌÖêÏ∏?Î°úÎìú
+    if (!loading) {
+      loadDynamicContent();
+    }
+    
+    // 5Î∂ÑÎßà???ôÏ†Å ÏΩòÌÖêÏ∏??ÖÎç∞?¥Ìä∏ (Î©îÏù∏ ?¥Ïä§Í∞Ä Î°úÎìú???ÅÌÉú?êÏÑúÎß?
+    let interval: NodeJS.Timeout | null = null;
+    if (!loading) {
+      interval = setInterval(loadDynamicContent, 5 * 60 * 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [loading]); // loading ?ÅÌÉúÍ∞Ä Î≥ÄÍ≤ΩÎê† ?åÎßå ?§Ìñâ
+
+  // ?ÑÏû¨ ?òÏù¥ÏßÄ???úÏãú??Í∏∞ÏÇ¨??  const getCurrentPageArticles = () => {
+    const startIndex = (currentPage - 1) * articlesPerPage;
+    const endIndex = startIndex + articlesPerPage;
+    return news.slice(startIndex, endIndex);
+  };
+
+  // ?òÏù¥ÏßÄ Î≥ÄÍ≤??∏Îì§??  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  // ?òÏù¥Ïß?Ïª¥Ìè¨?åÌä∏
+  const Pagination = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return (
+      <div className="flex justify-center items-center space-x-2 mt-8">
+        {/* ?¥Ï†Ñ ?òÏù¥ÏßÄ */}
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="px-3 py-2 rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          ?¥Ï†Ñ
+        </button>
+
+        {/* ?òÏù¥ÏßÄ Î≤àÌò∏??*/}
+        {pages.map((page) => (
+          <button
+            key={page}
+            onClick={() => handlePageChange(page)}
+            className={`px-3 py-2 rounded-md ${
+              currentPage === page
+                ? 'bg-gradient-to-r from-purple-500 to-blue-600 text-white shadow-lg'
+                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+
+        {/* ?§Ïùå ?òÏù¥ÏßÄ */}
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="px-3 py-2 rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          ?§Ïùå
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <>
+    <div className="min-h-screen pb-20">
+      {/* ?ÑÏ≤¥ ?îÎ©¥ ?ôÏòÅ??Î∞∞Í≤Ω - Ïπ¥Ïπ¥?§Ìéò???§Ì???*/}
+      <div className="absolute inset-0 w-full h-screen z-0">
+        {/* Î∞∞Í≤Ω ?ôÏòÅ??*/}
+        <video 
+          autoPlay 
+          muted 
+          loop 
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          poster="/image/news.webp"
+        >
+          <source src="/video/3433789-hd_1920_1080_25fps.mp4" type="video/mp4" />
+        </video>
+        
+        {/* ?¥Îëê???§Î≤Ñ?àÏù¥ - ?§ÌÅ¨Î°§Ïóê ?∞Îùº Î≥Ä??*/}
+        <div 
+          className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-black/20 transition-opacity duration-500 ease-out"
+          style={{ 
+            opacity: 1 - scrollProgress * 0.7 // ?§ÌÅ¨Î°§Ìï†?òÎ°ù ?¨Î™Ö?¥Ïßê
+          }}
+        ></div>
+        <div 
+          className="absolute inset-0 bg-gradient-to-br from-blue-600/40 via-purple-600/40 to-indigo-700/40 transition-opacity duration-500 ease-out"
+          style={{ 
+            opacity: 1 - scrollProgress * 0.8 // ?§ÌÅ¨Î°§Ìï†?òÎ°ù ?¨Î™Ö?¥Ïßê
+          }}
+        ></div>
+            </div>
+            
+      {/* Î©îÏù∏ ÏΩòÌÖêÏ∏?- ?ôÏòÅ???ÑÏóê ?§Î≤Ñ?àÏù¥ */}
+      <div className="relative z-10 min-h-screen">
+        {/* Ï≤??îÎ©¥ ?àÏñ¥Î°??πÏÖò - ?ÑÏ≤¥ ?îÎ©¥ */}
+        <div 
+          className="h-screen flex items-center justify-center transition-opacity duration-700 ease-out"
+          style={{ 
+            opacity: 1 - scrollProgress * 0.9 // ?§ÌÅ¨Î°§Ìï†?òÎ°ù ?òÏù¥???ÑÏõÉ
+          }}
+        >
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            
+            {/* ?ºÏ™Ω: Î©îÏù∏ ÏΩòÌÖêÏ∏?*/}
+            <div className="text-center lg:text-left">
+              {/* Î©îÏù∏ ?úÎ™© */}
+              <h1 className="text-4xl lg:text-6xl xl:text-7xl font-bold text-white mb-6 leading-tight">
+                ?¥Ïä§???àÎ°ú??Í≤ΩÌóò
+                    </h1>
+              
+              {/* ?úÎ∏å ?úÎ™© */}
+              <p className="text-xl lg:text-2xl text-blue-100 mb-8 leading-relaxed">
+                AIÍ∞Ä Î∂ÑÏÑù?òÎäî ÍπäÏù¥ ?àÎäî ?¥Ïä§?Ä ?§ÏãúÍ∞??∏Î†å???ïÎ≥¥Î•???Í≥≥Ïóê??ÎßåÎÇòÎ≥¥ÏÑ∏??              </p>
+              
+              {/* CTA Î≤ÑÌäº??*/}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-8">
+                <button 
+                  onClick={() => window.scrollTo({ top: 800, behavior: 'smooth' })}
+                  className="px-8 py-4 bg-white text-blue-600 font-semibold rounded-full hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                >
+                  ?¥Ïä§ ?òÎü¨Î≥¥Í∏∞
+                  </button>
+                <button 
+                  onClick={() => handleShare()}
+                  className="px-8 py-4 bg-transparent border-2 border-white text-white font-semibold rounded-full hover:bg-white hover:text-blue-600 transition-all duration-300 transform hover:scale-105"
+                >
+                    Í≥µÏú†?òÍ∏∞
+                  </button>
+                    </div>
+              
+              {/* ???§Ì???Í∏∞Îä• Ïπ¥Îìú??*/}
+              <div className="grid grid-cols-2 gap-4">
+                <div 
+                  className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 cursor-pointer"
+                  onClick={() => window.scrollTo({ top: 1600, behavior: 'smooth' })}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                      </svg>
+                </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">ÏµúÏã†?¥Ïä§</div>
+                      <div className="text-blue-200 text-xs">?§ÏãúÍ∞??ÖÎç∞?¥Ìä∏</div>
+                </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 cursor-pointer">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">?∏Î†å??/div>
+                      <div className="text-blue-200 text-xs">?∏Í∏∞ ?§Ïõå??/div>
+                </div>
+                    </div>
+                  </div>
+
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 cursor-pointer">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4.828 7l2.586 2.586a2 2 0 002.828 0L12.828 7H4.828z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">Îπ†Î•∏ Í≤Ä??/div>
+                      <div className="text-blue-200 text-xs">Ïπ¥ÌÖåÍ≥†Î¶¨Î≥?/div>
+                    </div>
+                  </div>
+                </div>
+                
+                <Link href="/mypage" className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20 hover:bg-white/15 transition-all duration-300 cursor-pointer">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">Î∂ÅÎßà??/div>
+                      <div className="text-blue-200 text-xs">?Ä?•Îêú ?¥Ïä§</div>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+                  </div>
+
+            {/* ?§Î•∏Ï™? Îπ†Î•∏ ?°ÏÑ∏??Î©îÎâ¥ */}
+            <div className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 lg:p-8 border border-white/20 shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl lg:text-2xl font-bold text-white flex items-center">
+                  <span className="text-2xl mr-3">??/span>
+                  Îπ†Î•∏ ?°ÏÑ∏??                      </h2>
+                <div className="flex items-center space-x-2 bg-blue-500/20 backdrop-blur-sm px-3 py-1 rounded-full border border-blue-500/30">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <span className="text-blue-200 text-sm font-bold">HOT</span>
+                </div>
+                    </div>
+                    
+              <div className="space-y-4">
+                {/* Ïπ¥ÌÖåÍ≥†Î¶¨ Î∞îÎ°úÍ∞ÄÍ∏?*/}
+                <div className="grid grid-cols-2 gap-3">
+                  <Link href="/it" className="group bg-gradient-to-br from-purple-500/20 to-blue-600/20 hover:from-purple-500/30 hover:to-blue-600/30 rounded-xl p-4 border border-purple-500/30 transition-all duration-300">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-blue-500 rounded-lg flex items-center justify-center">
+                        <span className="text-white text-lg">?íª</span>
+                      </div>
+                      <div>
+                        <div className="text-white font-semibold text-sm">IT ?¥Ïä§</div>
+                        <div className="text-purple-200 text-xs">Í∏∞Ïà† ?∏Î†å??/div>
+                      </div>
+                    </div>
+                  </Link>
+                  
+                  <Link href="/economy" className="group bg-gradient-to-br from-green-500/20 to-emerald-600/20 hover:from-green-500/30 hover:to-emerald-600/30 rounded-xl p-4 border border-green-500/30 transition-all duration-300">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center">
+                        <span className="text-white text-lg">?ìà</span>
+                      </div>
+                      <div>
+                        <div className="text-white font-semibold text-sm">Í≤ΩÏ†ú ?¥Ïä§</div>
+                        <div className="text-green-200 text-xs">?úÏû• ?ôÌñ•</div>
+                      </div>
+                    </div>
+                  </Link>
+                  
+                  <Link href="/sports" className="group bg-gradient-to-br from-orange-500/20 to-red-600/20 hover:from-orange-500/30 hover:to-red-600/30 rounded-xl p-4 border border-orange-500/30 transition-all duration-300">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center">
+                        <span className="text-white text-lg">??/span>
+                      </div>
+                      <div>
+                        <div className="text-white font-semibold text-sm">?§Ìè¨Ï∏??¥Ïä§</div>
+                        <div className="text-orange-200 text-xs">Í≤ΩÍ∏∞ Í≤∞Í≥º</div>
+                      </div>
+                    </div>
+                  </Link>
+                  
+                  <div className="group bg-gradient-to-br from-pink-500/20 to-purple-600/20 hover:from-pink-500/30 hover:to-purple-600/30 rounded-xl p-4 border border-pink-500/30 transition-all duration-300 cursor-pointer">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-pink-400 to-purple-500 rounded-lg flex items-center justify-center">
+                        <span className="text-white text-lg">?éØ</span>
+                      </div>
+                      <div>
+                        <div className="text-white font-semibold text-sm">AI Î∂ÑÏÑù</div>
+                        <div className="text-pink-200 text-xs">?§Îßà???¥Ïä§</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* ?§ÏãúÍ∞?Í≤Ä?âÏñ¥ & ?∏Í∏∞?¥Ïä§ */}
+                <div className="mt-6 pt-4 border-t border-white/20">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* ?§ÏãúÍ∞?Í≤Ä?âÏñ¥ */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-white font-semibold text-sm">?§ÏãúÍ∞?Í≤Ä?âÏñ¥</h3>
+                        <span className="text-white/60 text-xs">?§ÏãúÍ∞?/span>
+                      </div>
+                      <div className="space-y-2">
+                        {Array.isArray(searchKeywords) && searchKeywords.length > 0 ? searchKeywords.slice(0, 5).map((item, index) => (
+                  <div 
+                    key={item.keyword || `keyword-${index}`} 
+                            className="flex items-center space-x-3 p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                    onClick={() => handleSearch(item.keyword)}
+                  >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              (item.rank || index + 1) <= 3 
+                          ? 'bg-red-500 text-white' 
+                          : 'bg-white/20 text-white'
+                      }`}>
+                        {item.rank || index + 1}
+                            </div>
+                            <span className="text-white text-sm group-hover:text-yellow-200 transition-colors">
+                        {item.keyword || 'Í≤Ä?âÏñ¥ ?ÜÏùå'}
+                                </span>
+                              </div>
+                        )) : (
+                          // Í≤Ä?âÏñ¥Í∞Ä ?ÜÏùÑ ??Í∏∞Î≥∏Í∞?                          <>
+                            {[
+                              { rank: 1, keyword: 'AI Í∏∞Ïà† ?ÅÏã†', color: 'bg-red-500' },
+                              { rank: 2, keyword: 'Í≤ΩÏ†ú ?ïÏ±Ö Î≥Ä??, color: 'bg-orange-500' },
+                              { rank: 3, keyword: '?§Ìè¨Ï∏??¥Ïäà', color: 'bg-yellow-500' },
+                              { rank: 4, keyword: 'Í∏∞Ïà† ?∏Î†å??, color: 'bg-gray-500' },
+                              { rank: 5, keyword: '?úÏû• ?ôÌñ•', color: 'bg-gray-500' },
+                              { rank: 6, keyword: '?¨Ìöå ?¥Ïäà', color: 'bg-gray-500' },
+                              { rank: 7, keyword: 'Î¨∏Ìôî ?åÏãù', color: 'bg-gray-500' },
+                              { rank: 8, keyword: '?òÍ≤Ω ?¥Ïä§', color: 'bg-gray-500' },
+                              { rank: 9, keyword: 'ÍµêÏú° ?ïÏ±Ö', color: 'bg-gray-500' },
+                              { rank: 10, keyword: 'Í±¥Í∞ï ?ïÎ≥¥', color: 'bg-gray-500' }
+                            ].slice(0, 5).map((item) => (
+                              <div key={item.rank} className="flex items-center space-x-3 p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
+                                <div className={`w-6 h-6 ${item.color} text-white rounded-full flex items-center justify-center text-xs font-bold`}>
+                                  {item.rank}
+                              </div>
+                                <span className="text-white text-sm">{item.keyword}</span>
+                            </div>
+                            ))}
+                          </>
+                        )}
+                          </div>
+                      
+                    </div>
+                    
+                    {/* ?∏Í∏∞?¥Ïä§ */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-white font-semibold text-sm">?∏Í∏∞?¥Ïä§</h3>
+                        <span className="text-white/60 text-xs">HOT</span>
+                      </div>
+                      <div className="space-y-2">
+                        {mainPopularNews ? (
+                          <div 
+                            className="group p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                            onClick={() => {
+                              const newsArticle = {
+                                id: String(mainPopularNews.newsId),
+                                title: mainPopularNews.newsTitle
+                              };
+                              handleNewsClick(newsArticle);
+                              window.location.href = `/news/${mainPopularNews.newsId}`;
+                            }}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <div className="w-6 h-6 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <span className="text-white text-xs font-bold">1</span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-white text-sm font-medium line-clamp-2 group-hover:text-yellow-200 transition-colors">
+                                  {mainPopularNews.newsTitle}
+                                </h4>
+                                <div className="flex items-center space-x-2 mt-1">
+                                  <span className="text-white/60 text-xs">?ëÅÔ∏?{mainPopularNews.clickCount}??/span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          // ?∏Í∏∞?¥Ïä§Í∞Ä ?ÜÏùÑ ??Í∏∞Î≥∏Í∞?                          <>
+                            {[
+                              { rank: 1, title: 'ÏµúÏã† Í∏∞Ïà† ?∏Î†å?úÏ? AI ?ÅÏã† ?åÏãù', views: '1,247', color: 'from-red-500 to-pink-500' },
+                              { rank: 2, title: 'Í≤ΩÏ†ú ?ïÏ±Ö Î≥Ä?îÏ? ?úÏû• ?ôÌñ•', views: '892', color: 'from-orange-500 to-red-500' },
+                              { rank: 3, title: '?§Ìè¨Ï∏??¥Ïäà?Ä Í≤ΩÍ∏∞ Í≤∞Í≥º', views: '654', color: 'from-yellow-500 to-orange-500' },
+                              { rank: 4, title: '?¨Ìöå ?ÑÏïàÍ≥??ïÏ±Ö ?åÏãù', views: '423', color: 'from-purple-500 to-pink-500' },
+                              { rank: 5, title: 'Î¨∏Ìôî?Ä ?ùÌôú ?ïÎ≥¥', views: '321', color: 'from-blue-500 to-purple-500' }
+                            ].slice(0, 3).map((item) => (
+                              <div key={item.rank} className="group p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
+                                <div className="flex items-start space-x-3">
+                                  <div className={`w-6 h-6 bg-gradient-to-r ${item.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                                    <span className="text-white text-xs font-bold">{item.rank}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-white text-sm font-medium line-clamp-2 group-hover:text-yellow-200 transition-colors">
+                                      {item.title}
+                                    </h4>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      <span className="text-white/60 text-xs">?ëÅÔ∏?{item.views}??/span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        )}
+                        
+                        {popularNewsList && popularNewsList.length > 1 && (
+                          <>
+                            {popularNewsList.slice(1, 3).map((news, index) => (
+                              <div 
+                                key={news.newsId}
+                                className="group p-2 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
+                                onClick={() => {
+                                  const newsArticle = {
+                                    id: String(news.newsId),
+                                    title: news.newsTitle
+                                  };
+                                  handleNewsClick(newsArticle);
+                                  window.location.href = `/news/${news.newsId}`;
+                                }}
+                              >
+                                <div className="flex items-start space-x-3">
+                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                    index === 0 ? 'bg-gradient-to-r from-orange-500 to-red-500' : 'bg-gradient-to-r from-yellow-500 to-orange-500'
+                                  }`}>
+                                    <span className="text-white text-xs font-bold">{index + 2}</span>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="text-white text-sm font-medium line-clamp-2 group-hover:text-yellow-200 transition-colors">
+                                      {news.newsTitle}
+                                    </h4>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      <span className="text-white/60 text-xs">?ëÅÔ∏?{news.clickCount}??/span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                )}
+                    </div>
+
+                    </div>
+                    </div>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        {/* ?§ÌÅ¨Î°??§Ïö¥ ?åÌä∏ */}
+        <div 
+          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/70 animate-bounce transition-opacity duration-300"
+          style={{ 
+            opacity: scrollProgress > 0.1 ? 0 : 1 // ?§ÌÅ¨Î°§ÌïòÎ©??¨ÎùºÏß?          }}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+          </div>
+        </div>
+
+      {/* Î©îÏù∏ ÏΩòÌÖêÏ∏?- ?∞ÏÉâ Î∞∞Í≤Ω */}
+      <div className="bg-white">
+        <div className="container mx-auto px-4 py-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Î©îÏù∏ ?¥Ïä§ ?ÅÏó≠ */}
+          <div className="w-full">
+            {/* Í≤Ä?âÏ∞ΩÍ≥?Ïπ¥ÌÖåÍ≥†Î¶¨ ?úÏãú */}
+            <div className="mb-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+                <div className="flex-1 max-w-md">
+                  <SearchBar 
+                    onSearch={handleSearch}
+                    placeholder="?¥Ïä§ Í≤Ä??(?úÎ™©, ?¥Ïö©, Ïπ¥ÌÖåÍ≥†Î¶¨)..."
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 rounded-full border border-blue-200">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {news.length}Í∞??§ÌÜ†Î¶?                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-purple-50 to-pink-50 px-3 py-2 rounded-full border border-purple-200">
+                    <span className="text-sm font-medium text-gray-700">
+                      {currentPage}/{totalPages}
+                    </span>
+                    <span className="text-xs text-gray-500">?òÏù¥ÏßÄ</span>
+                  </div>
+                  {searchKeyword && (
+                    <span className="ml-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-full text-xs shadow-md font-medium">
+                      '{searchKeyword}' Í≤Ä?âÍ≤∞Í≥?                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-center mb-6">
+                <p className="text-gray-600 mb-2">
+                  {searchKeyword ? (
+                    <>
+                      {news.length > 0 ? (
+                        <span>'${searchKeyword}'?Ä Í¥Ä?®Îêú ?¥Ïä§Î•?Ï∞æÏïò?µÎãà??/span>
+                      ) : (
+                        <span>'${searchKeyword}'?Ä Í¥Ä?®Îêú ?¥Ïä§Î•?Ï∞æÏùÑ ???ÜÏäµ?àÎã§</span>
+                      )}
+                    </>
+                  ) : (
+                    <span>IT, ?§Ìè¨Ï∏? Í≤ΩÏ†ú ???§Ïñë??Î∂ÑÏïº??ÏµúÏã† ?åÏãù???ïÏù∏?òÏÑ∏??/span>
+                  )}
+                </p>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {searchKeyword ? (
+                    <span>'{searchKeyword}' Í≤Ä??Í≤∞Í≥º</span>
+                  ) : (
+                    <span>ÏµúÏã† ?¥Ïä§</span>
+                  )}
+            </h2>
+                {searchKeyword && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => handleSearch('')}
+                      className="px-4 py-2 text-sm text-gray-600 hover:text-purple-600 border border-gray-300 rounded-lg hover:border-purple-500 transition-colors"
+                    >
+                      ?ÑÏ≤¥ Î≥¥Í∏∞
+                    </button>
+                  </div>
+                )}
+              </div>
+      </div>
+
+            {/* ?¥Ïä§ Í∑∏Î¶¨??- ?ÑÏÑúÍ¥Ä Ï±??§Ì???*/}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {loading ? (
+                // Î°úÎî© ?§Ïºà?àÌÜ§ - Î™®Îçò Ïπ¥Îìú ?§Ì???                Array.from({ length: 8 }).map((_, index) => (
+                  <div 
+                    key={index} 
+                    className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg border-l-8 border-gray-400 overflow-hidden animate-pulse"
+                    style={{
+                      animationDelay: `${index * 100}ms`,
+                      animation: 'bookSlideIn 0.8s ease-out forwards'
+                    }}
+                  >
+                    <div className="h-64 bg-gradient-to-br from-gray-200 to-gray-300"></div>
+                    <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-16 h-6 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="w-12 h-6 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                      <div className="space-y-2 mb-4">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                      </div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse mb-4"></div>
+                      <div className="flex justify-between items-center pt-3 border-t border-gray-300">
+                        <div className="w-20 h-3 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                // ?ÑÏû¨ ?òÏù¥ÏßÄ Í∏∞ÏÇ¨?§Îßå ?úÏãú - Î™®Îçò Ïπ¥Îìú ?§Ì???                getCurrentPageArticles().map((article, index) => (
+                  <Link 
+                    key={index} 
+                    href={`/news/${article.id}`}
+                    className="group relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg border-l-8 border-gray-400 overflow-hidden hover:shadow-xl hover:border-gray-500 transition-all duration-300"
+                    style={{
+                      animationDelay: `${index * 100}ms`,
+                      animation: 'bookSlideIn 0.8s ease-out forwards',
+                      transformStyle: 'preserve-3d'
+                    }}
+                    onClick={() => handleNewsClick(article)}
+                  >
+                    {/* ?†Î¨∏ ?úÏ? ?ÅÏó≠ - ?†Î¨∏ ?§Ì???*/}
+                      <div className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300 border-b-2 border-gray-400">
+                        {/* ?†Î¨∏ ??Î∂ÄÎ∂?*/}
+                        <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-gray-600 to-gray-700 shadow-lg"></div>
+                        {/* ?†Î¨∏ ?òÏù¥ÏßÄ ?®Í≥º */}
+                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                        {article.imageUrl ? (
+                          <img
+                            src={article.imageUrl}
+                            alt={article.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `
+                                <div class="w-full h-full flex items-center justify-center bg-gradient-to-br ${
+                                  article.category === 'it' ? 'from-blue-50 to-indigo-100' :
+                                  article.category === 'sports' ? 'from-green-50 to-emerald-100' :
+                                  article.category === 'economy' ? 'from-purple-50 to-violet-100' : 'from-gray-50 to-gray-100'
+                                }">
+                                  <div class="text-4xl opacity-60">
+                                    ${article.category === 'it' ? '?íª' :
+                                      article.category === 'sports' ? '?? :
+                                      article.category === 'economy' ? '?í∞' : '?ì∞'}
+                                    </div>
+                                  </div>
+                                `;
+                              }
+                            }}
+                          />
+                        ) : (
+                        <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${
+                          article.category === 'it' ? 'from-blue-50 to-indigo-100' :
+                            article.category === 'sports' ? 'from-green-50 to-emerald-100' :
+                          article.category === 'economy' ? 'from-purple-50 to-violet-100' : 'from-gray-50 to-gray-100'
+                        }`}>
+                          <div className="text-4xl opacity-60">
+                            {article.category === 'it' ? '?íª' :
+                             article.category === 'sports' ? '?? :
+                             article.category === 'economy' ? '?í∞' : '?ì∞'}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Ïπ¥ÌÖåÍ≥†Î¶¨ ?ºÎ≤® - ?†Î¨∏ ?§Ì???*/}
+                      <div className="absolute top-3 left-3">
+                        <div className={`px-3 py-1 rounded-md text-xs font-bold shadow-md ${
+                          article.category === 'it' ? 'bg-blue-600 text-white' :
+                          article.category === 'sports' ? 'bg-green-600 text-white' :
+                          article.category === 'economy' ? 'bg-purple-600 text-white' : 'bg-gray-600 text-white'
+                          }`}>
+                            <span>
+                              {article.category === 'it' ? 'Í∏∞Ïà†' :
+                               article.category === 'sports' ? '?§Ìè¨Ï∏? :
+                               article.category === 'economy' ? 'Í≤ΩÏ†ú' : '?ºÎ∞ò'}
+                            </span>
+                        </div>
+                      </div>
+                      
+                      {/* NEW ?ºÎ≤® - ÏµúÍ∑º 3Í∞úÎßå */}
+                      {index < 3 && (
+                        <div className="absolute top-3 right-3">
+                          <div className="px-3 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-lg">
+                            NEW
+                          </div>
+                        </div>
+                      )}
+                      </div>
+                      
+                    {/* ?†Î¨∏ ?¥Ïö© ?ÅÏó≠ - ?†Î¨∏ ?§Ì???*/}
+                    <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100">
+                      {/* ?†Î¨∏ ?úÎ™© - ?†Î¨∏ ?§Ì???*/}
+                      <div className="mb-3">
+                        <div className="w-full h-1 bg-gradient-to-r from-gray-400 to-gray-500 mb-2 rounded-full"></div>
+                        <h3 className="text-lg font-bold text-gray-800 line-clamp-2 group-hover:text-gray-700 transition-colors duration-200 leading-tight" style={{fontFamily: 'serif'}}>
+                          {article.title}
+                        </h3>
+                        <div className="w-full h-1 bg-gradient-to-r from-gray-500 to-gray-400 mt-2 rounded-full"></div>
+                      </div>
+                      <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
+                        {article.description || "ÏµúÏã† ?¥Ïä§?Ä Í∏∞Ïà† ?ôÌñ•???ïÏù∏?¥Î≥¥?∏Ïöî."}
+                      </p>
+                      
+                      {/* ?†Î¨∏ ?ïÎ≥¥ - ?†Î¨∏ ?§Ì???*/}
+                      <div className="pt-3 border-t border-gray-300">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-semibold text-gray-700 text-sm" style={{fontFamily: 'serif'}}>{article.source}</span>
+                          <span className="font-semibold text-gray-700 text-sm" style={{fontFamily: 'serif'}}>
+                            {new Date(article.pubDate).toLocaleDateString('ko-KR', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                        {/* ?†Î¨∏ Î∞îÏΩî???®Í≥º */}
+                        <div className="flex justify-center">
+                          <div className="w-20 h-1 bg-gradient-to-r from-gray-400 via-gray-600 to-gray-400 rounded-full opacity-70"></div>
+                        </div>
+                      </div>
+                      
+                      {/* Ï±ÖÏû•?êÏÑú Í∫ºÎÇ¥Í∏??®Í≥º */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+
+            {!loading && news.length > 0 && <Pagination />}
+
+            {/* Î©îÏù∏Î∞∞ÎÑà Í∏∞Îä• ?∞Í≤∞ Ïπ¥Îìú??*/}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              {/* ÏµúÏã†?¥Ïä§ Ïπ¥Îìú */}
+              <div 
+                className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/30 cursor-pointer"
+                onClick={() => window.scrollTo({ top: 1600, behavior: 'smooth' })}
+              >
+              <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl text-white">?ì∞</span>
+                </div>
+                <div className="text-right">
+                    <div className="flex items-center space-x-1">
+                      <div className="text-2xl font-bold text-blue-600">LIVE</div>
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              </div>
+                    <div className="text-xs text-gray-500">?§ÏãúÍ∞??ÖÎç∞?¥Ìä∏</div>
+            </div>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">?§ÏãúÍ∞??¥Ïä§</h3>
+                <p className="text-sm text-gray-600 mb-4">ÏßÄÍ∏?Í∞Ä??Ï£ºÎ™©Î∞õÎäî ?¥Ïä§??/p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full" style={{width: '100%'}}></div>
+        </div>
+      </div>
+
+              {/* ?∏Î†å??Ïπ¥Îìú */}
+              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/30 cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl text-white">?ìà</span>
+          </div>
+                <div className="text-right">
+                    <div className="text-2xl font-bold text-green-600">HOT</div>
+                    <div className="text-xs text-gray-500">?∏Î†å??/div>
+                </div>
+              </div>
+                <h3 className="font-bold text-gray-900 mb-2">?∏Í∏∞ ?§Ïõå??/h3>
+                <p className="text-sm text-gray-600 mb-4">ÏßÄÍ∏?Í∞Ä??ÎßéÏù¥ Í≤Ä?âÎêò??Ï£ºÏ†ú</p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-600 h-2 rounded-full" style={{width: '85%'}}></div>
+        </div>
+      </div>
+
+              {/* Îπ†Î•∏ Í≤Ä??Ïπ¥Îìú */}
+              <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/30 cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl text-white">?îç</span>
+                </div>
+                <div className="text-right">
+                    <div className="text-2xl font-bold text-orange-600">3</div>
+                    <div className="text-xs text-gray-500">Ïπ¥ÌÖåÍ≥†Î¶¨</div>
+                </div>
+              </div>
+                <h3 className="font-bold text-gray-900 mb-2">Ïπ¥ÌÖåÍ≥†Î¶¨Î≥?Í≤Ä??/h3>
+                <p className="text-sm text-gray-600 mb-4">IT, Í≤ΩÏ†ú, ?§Ìè¨Ï∏?Î∂ÑÏïºÎ≥??¥Ïä§</p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-orange-500 to-red-600 h-2 rounded-full" style={{width: '90%'}}></div>
+              </div>
+            </div>
+
+              {/* Î∂ÅÎßà??Ïπ¥Îìú */}
+              <Link href="/mypage" className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/30 cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                    <span className="text-2xl text-white">‚≠?/span>
+                </div>
+                <div className="text-right">
+                    <div className="text-2xl font-bold text-purple-600">??/div>
+                    <div className="text-xs text-gray-500">?Ä??/div>
+                </div>
+              </div>
+                <h3 className="font-bold text-gray-900 mb-2">?Ä?•Îêú ?¥Ïä§</h3>
+                <p className="text-sm text-gray-600 mb-4">?òÎßå??Î∂ÅÎßà??Ïª¨Î†â??/p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-gradient-to-r from-purple-500 to-pink-600 h-2 rounded-full" style={{width: '75%'}}></div>
+              </div>
+              </Link>
+          </div>
+
+            {/* Í∞ÑÏÜå?îÎêú AI Î∂ÑÏÑù ?πÏÖò */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-8 shadow-lg border border-white/30">
+              <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                  <span className="text-2xl mr-3">?§ñ</span>
+                  AI ?¥Ïä§ Î∂ÑÏÑù
+              </h3>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-gray-500">?§ÏãúÍ∞?Î∂ÑÏÑù Ï§?/span>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-purple-600 mb-2 animate-pulse">2.3Ï¥?/div>
+                <div className="text-sm text-gray-600">?âÍ∑† Î∂ÑÏÑù ?úÍ∞Ñ</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-blue-600 mb-2 animate-pulse">1,247</div>
+                <div className="text-sm text-gray-600">?§Îäò Î∂ÑÏÑù???¥Ïä§</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-indigo-600 mb-2 animate-pulse">94.2%</div>
+                <div className="text-sm text-gray-600">?ÑÏ≤¥ ?âÍ∑† ?†Î¢∞??/div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Î©îÏù∏ ÏΩòÌÖêÏ∏?- ?∞ÏÉâ Î∞∞Í≤Ω */}
+      <div className="bg-white">
+        <div className="container mx-auto px-4 py-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Î©îÏù∏ ?¥Ïä§ ?ÅÏó≠ */}
+          <div className="w-full">
+            {/* Í≤Ä?âÏ∞ΩÍ≥?Ïπ¥ÌÖåÍ≥†Î¶¨ ?úÏãú */}
+            <div className="mb-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+                <div className="flex-1 max-w-md">
+                  <SearchBar 
+                    onSearch={handleSearch}
+                    placeholder="?¥Ïä§ Í≤Ä??(?úÎ™©, ?¥Ïö©, Ïπ¥ÌÖåÍ≥†Î¶¨)..."
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-blue-50 to-purple-50 px-3 py-2 rounded-full border border-blue-200">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {news.length}Í∞??§ÌÜ†Î¶?                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 bg-gradient-to-r from-purple-50 to-pink-50 px-3 py-2 rounded-full border border-purple-200">
+                    <span className="text-sm font-medium text-gray-700">
+                      {currentPage}/{totalPages}
+                    </span>
+                    <span className="text-xs text-gray-500">?òÏù¥ÏßÄ</span>
+                  </div>
+                  {searchKeyword && (
+                    <span className="ml-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-full text-xs shadow-md font-medium">
+                      '{searchKeyword}' Í≤Ä?âÍ≤∞Í≥?                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-center mb-6">
+                <p className="text-gray-600 mb-2">
+                  {searchKeyword ? (
+                    <>
+                      {news.length > 0 ? (
+                        <span>'${searchKeyword}'?Ä Í¥Ä?®Îêú ?¥Ïä§Î•?Ï∞æÏïò?µÎãà??/span>
+                      ) : (
+                        <span>'${searchKeyword}'?Ä Í¥Ä?®Îêú ?¥Ïä§Î•?Ï∞æÏùÑ ???ÜÏäµ?àÎã§</span>
+                      )}
+                    </>
+                  ) : (
+                    <span>IT, ?§Ìè¨Ï∏? Í≤ΩÏ†ú ???§Ïñë??Î∂ÑÏïº??ÏµúÏã† ?åÏãù???ïÏù∏?òÏÑ∏??/span>
+                  )}
+                </p>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {searchKeyword ? (
+                    <span>'{searchKeyword}' Í≤Ä??Í≤∞Í≥º</span>
+                  ) : (
+                    <span>ÏµúÏã† ?¥Ïä§</span>
+                  )}
+                </h2>
+                {searchKeyword && (
+                  <div className="mt-4">
+                  <button
+                    onClick={() => handleSearch('')}
+                    className="px-4 py-2 text-sm text-gray-600 hover:text-purple-600 border border-gray-300 rounded-lg hover:border-purple-500 transition-colors"
+                  >
+                    ?ÑÏ≤¥ Î≥¥Í∏∞
+                  </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ?¥Ïä§ Í∑∏Î¶¨??- ?ÑÏÑúÍ¥Ä Ï±??§Ì???*/}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {loading ? (
+                // Î°úÎî© ?§Ïºà?àÌÜ§ - Î™®Îçò Ïπ¥Îìú ?§Ì???                Array.from({ length: 8 }).map((_, index) => (
+                  <div 
+                    key={index} 
+                    className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg border-l-8 border-gray-400 overflow-hidden animate-pulse"
+                    style={{
+                      animationDelay: `${index * 100}ms`,
+                      animation: 'bookSlideIn 0.8s ease-out forwards'
+                    }}
+                  >
+                    <div className="h-64 bg-gradient-to-br from-gray-200 to-gray-300"></div>
+                    <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-16 h-6 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="w-12 h-6 bg-gray-200 rounded animate-pulse"></div>
+                          </div>
+                      <div className="space-y-2 mb-4">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="h-4 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                        </div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse mb-4"></div>
+                      <div className="flex justify-between items-center pt-3 border-t border-gray-300">
+                        <div className="w-20 h-3 bg-gray-200 rounded animate-pulse"></div>
+                        <div className="w-16 h-3 bg-gray-200 rounded animate-pulse"></div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                // ?ÑÏû¨ ?òÏù¥ÏßÄ Í∏∞ÏÇ¨?§Îßå ?úÏãú - Î™®Îçò Ïπ¥Îìú ?§Ì???                getCurrentPageArticles().map((article, index) => (
+                  <Link 
+                    key={index} 
+                    href={`/news/${article.id}`}
+                    className="group relative bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg border-l-8 border-gray-400 overflow-hidden hover:shadow-xl hover:border-gray-500 transition-all duration-300"
+                    style={{
+                      animationDelay: `${index * 100}ms`,
+                      animation: 'bookSlideIn 0.8s ease-out forwards',
+                      transformStyle: 'preserve-3d'
+                    }}
+                    onClick={() => handleNewsClick(article)}
+                  >
+                    {/* ?†Î¨∏ ?úÏ? ?ÅÏó≠ - ?†Î¨∏ ?§Ì???*/}
+                      <div className="relative h-64 overflow-hidden bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300 border-b-2 border-gray-400">
+                        {/* ?†Î¨∏ ??Î∂ÄÎ∂?*/}
+                        <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-gray-600 to-gray-700 shadow-lg"></div>
+                        {/* ?†Î¨∏ ?òÏù¥ÏßÄ ?®Í≥º */}
+                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                        {article.imageUrl ? (
+                          <img
+                            src={article.imageUrl}
+                            alt={article.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `
+                                <div class="w-full h-full flex items-center justify-center bg-gradient-to-br ${
+                                  article.category === 'it' ? 'from-blue-50 to-indigo-100' :
+                                  article.category === 'sports' ? 'from-green-50 to-emerald-100' :
+                                  article.category === 'economy' ? 'from-purple-50 to-violet-100' : 'from-gray-50 to-gray-100'
+                                }">
+                                  <div class="text-4xl opacity-60">
+                                    ${article.category === 'it' ? '?íª' :
+                                      article.category === 'sports' ? '?? :
+                                      article.category === 'economy' ? '?í∞' : '?ì∞'}
+                                    </div>
+                                  </div>
+                                `;
+                              }
+                            }}
+                          />
+                        ) : (
+                        <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br ${
+                          article.category === 'it' ? 'from-blue-50 to-indigo-100' :
+                            article.category === 'sports' ? 'from-green-50 to-emerald-100' :
+                          article.category === 'economy' ? 'from-purple-50 to-violet-100' : 'from-gray-50 to-gray-100'
+                        }`}>
+                          <div className="text-4xl opacity-60">
+                            {article.category === 'it' ? '?íª' :
+                             article.category === 'sports' ? '?? :
+                             article.category === 'economy' ? '?í∞' : '?ì∞'}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Ïπ¥ÌÖåÍ≥†Î¶¨ ?ºÎ≤® - ?†Î¨∏ ?§Ì???*/}
+                      <div className="absolute top-3 left-3">
+                        <div className={`px-3 py-1 rounded-md text-xs font-bold shadow-md ${
+                          article.category === 'it' ? 'bg-blue-600 text-white' :
+                          article.category === 'sports' ? 'bg-green-600 text-white' :
+                          article.category === 'economy' ? 'bg-purple-600 text-white' : 'bg-gray-600 text-white'
+                          }`}>
+                            <span>
+                              {article.category === 'it' ? 'Í∏∞Ïà†' :
+                             article.category === 'sports' ? '?§Ìè¨Ï∏? :
+                               article.category === 'economy' ? 'Í≤ΩÏ†ú' : '?ºÎ∞ò'}
+                        </span>
+                        </div>
+                      </div>
+                      
+                      {/* NEW ?ºÎ≤® - ÏµúÍ∑º 3Í∞úÎßå */}
+                      {index < 3 && (
+                      <div className="absolute top-3 right-3">
+                          <div className="px-3 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-lg">
+                            NEW
+                        </div>
+                        </div>
+                      )}
+                      </div>
+                      
+                    {/* ?†Î¨∏ ?¥Ïö© ?ÅÏó≠ - ?†Î¨∏ ?§Ì???*/}
+                    <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100">
+                      {/* ?†Î¨∏ ?úÎ™© - ?†Î¨∏ ?§Ì???*/}
+                      <div className="mb-3">
+                        <div className="w-full h-1 bg-gradient-to-r from-gray-400 to-gray-500 mb-2 rounded-full"></div>
+                        <h3 className="text-lg font-bold text-gray-800 line-clamp-2 group-hover:text-gray-700 transition-colors duration-200 leading-tight" style={{fontFamily: 'serif'}}>
+                          {article.title}
+                        </h3>
+                        <div className="w-full h-1 bg-gradient-to-r from-gray-500 to-gray-400 mt-2 rounded-full"></div>
+                      </div>
+                      <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
+                        {article.description || "ÏµúÏã† ?¥Ïä§?Ä Í∏∞Ïà† ?ôÌñ•???ïÏù∏?¥Î≥¥?∏Ïöî."}
+                      </p>
+                      
+                      {/* ?†Î¨∏ ?ïÎ≥¥ - ?†Î¨∏ ?§Ì???*/}
+                      <div className="pt-3 border-t border-gray-300">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-semibold text-gray-700 text-sm" style={{fontFamily: 'serif'}}>{article.source}</span>
+                          <span className="font-semibold text-gray-700 text-sm" style={{fontFamily: 'serif'}}>
+                              {new Date(article.pubDate).toLocaleDateString('ko-KR', {
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </span>
+                      </div>
+                        {/* ?†Î¨∏ Î∞îÏΩî???®Í≥º */}
+                        <div className="flex justify-center">
+                          <div className="w-20 h-1 bg-gradient-to-r from-gray-400 via-gray-600 to-gray-400 rounded-full opacity-70"></div>
+                        </div>
+                      </div>
+                      
+                      {/* Ï±ÖÏû•?êÏÑú Í∫ºÎÇ¥Í∏??®Í≥º */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+
+            {/* ?òÏù¥Ïß?*/}
+            {!loading && news.length > 0 && <Pagination />}
+
+                    {/* ?éØ ?êÎ†à?¥ÏÖò - ?∞Î¶¨ ?¨Ïù¥???§Ì???*/}
+        <div className="mt-8 mb-8">
+              <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+              <span className="text-3xl md:text-4xl mr-3">?éØ</span>
+              ?êÎ†à?¥ÏÖò
+                </h2>
+            <button className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium text-sm">
+              ?êÎ†à?¥ÏÖò ?îÎ≥¥Í∏?+
+            </button>
+              </div>
+          
+          {/* Î©îÏù∏ ?êÎ†à?¥ÏÖò ?¥Ïä§ */}
+          {mainPopularNews && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
+                {/* ?ºÏ™Ω: ?¥Ïä§ ?¥Î?ÏßÄ */}
+                <div className="lg:col-span-1">
+                  <div 
+                    className="h-64 lg:h-full relative overflow-hidden cursor-pointer group"
+                    onClick={() => {
+                      // ?êÎ†à?¥ÏÖò ?¥Ïä§ ?¥Î?ÏßÄ ?¥Î¶≠ Ï∂îÏ†Å
+                      const newsArticle = {
+                        id: String(mainPopularNews.newsId),
+                        title: mainPopularNews.newsTitle
+                      };
+                      handleNewsClick(newsArticle);
+                      // ?òÏù¥ÏßÄ ?¥Îèô
+                      window.location.href = `/news/${mainPopularNews.newsId}`;
+                    }}
+                  >
+                    <img 
+                      src={mainPopularNews.imageUrl || '/image/news.webp'} 
+                      alt={mainPopularNews.newsTitle}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent group-hover:from-black/30 transition-all duration-300"></div>
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center shadow-lg">
+                        <span className="text-lg mr-1">?î•</span>
+                        HOT
+                      </span>
+                      </div>
+                    <div className="absolute bottom-4 left-4 text-white">
+                      <div className="text-sm opacity-80">?§ÏãúÍ∞??¥Ïä§</div>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="bg-white/20 backdrop-blur-sm rounded-full p-3">
+                        <span className="text-white text-2xl">?ëÅÔ∏?/span>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* ?§Î•∏Ï™? ?¥Ïä§ ?ïÎ≥¥ */}
+                <div className="lg:col-span-2 p-6 lg:p-8">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <span className="bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400 px-3 py-1 rounded-full text-sm font-medium">
+                          #1 ?∏Í∏∞?¥Ïä§
+                        </span>
+                        <span className="text-gray-500 dark:text-gray-400 text-sm">
+                          {mainPopularNews.lastClickedAt ? new Date(mainPopularNews.lastClickedAt).toLocaleDateString('ko-KR') : '?§Îäò'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <h1 
+                      className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white leading-tight cursor-pointer hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                      onClick={() => {
+                        // ?êÎ†à?¥ÏÖò ?¥Ïä§ ?úÎ™© ?¥Î¶≠ Ï∂îÏ†Å
+                        const newsArticle = {
+                          id: String(mainPopularNews.newsId),
+                          title: mainPopularNews.newsTitle
+                        };
+                        handleNewsClick(newsArticle);
+                        // ?òÏù¥ÏßÄ ?¥Îèô
+                        window.location.href = `/news/${mainPopularNews.newsId}`;
+                      }}
+                    >
+                      {mainPopularNews.newsTitle}
+                    </h1>
+                    
+                    <p className="text-gray-600 dark:text-gray-300 text-base leading-relaxed">
+                      {mainPopularNews.description && mainPopularNews.description !== mainPopularNews.newsTitle
+                        ? (mainPopularNews.description.length > 120 
+                            ? mainPopularNews.description.slice(0, 120) + '...'
+                            : mainPopularNews.description)
+                        : (mainPopularNews.newsTitle.length > 120 
+                            ? mainPopularNews.newsTitle.slice(0, 120) + '...'
+                            : mainPopularNews.newsTitle)
+                      }
+                    </p>
+                    
+                    <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center space-x-1">
+                        <span>?ëÅÔ∏?/span>
+                        <span className="font-semibold text-purple-600 dark:text-purple-400">{mainPopularNews.clickCount}??Ï°∞Ìöå</span>
+                  </div>
+                      <div className="flex items-center space-x-1">
+                        <span>?í¨</span>
+                        <span className="font-semibold text-green-600 dark:text-green-400">{mainPopularNews.clickCount}Í∞??ìÍ?</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span>‚≠?/span>
+                        <span className="font-semibold text-yellow-600 dark:text-yellow-400">?∏Í∏∞?úÏúÑ 1??/span>
+              </div>
+            </div>
+
+                    <div className="flex space-x-3 pt-4">
+                      <Link 
+                        href={`/news/${mainPopularNews.newsId}`}
+                        onClick={() => {
+                          // ?êÎ†à?¥ÏÖò ?¥Ïä§ ?¥Î¶≠ Ï∂îÏ†Å
+                          const newsArticle = {
+                            id: String(mainPopularNews.newsId),
+                            title: mainPopularNews.newsTitle
+                          };
+                          handleNewsClick(newsArticle);
+                        }}
+                        className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                      >
+                        ?ÅÏÑ∏?ïÎ≥¥
+                      </Link>
+                      <button 
+                        onClick={() => handleShare({
+                          id: String(mainPopularNews.newsId),
+                          title: mainPopularNews.newsTitle,
+                          description: mainPopularNews.description
+                        } as RSSArticle)}
+                        className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                        </svg>
+                        Í≥µÏú†?òÍ∏∞
+                      </button>
+                        </div>
+                      </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+              </div>
+
+
+
+                        {/* ?éØ Ïπ¥ÌÖåÍ≥†Î¶¨Î≥??¥Ïä§ */}
+            <div className="mt-12 mb-8">
+              <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-700 p-6 text-white shadow-lg">
+                  <h3 className="text-xl font-bold flex items-center">
+                    <span className="text-2xl mr-3">?ì∞</span>
+                    Ïπ¥ÌÖåÍ≥†Î¶¨Î≥??¥Ïä§
+                </h3>
+                  <p className="text-sm opacity-90 mt-1">Í¥Ä??Î∂ÑÏïºÎ≥ÑÎ°ú ?¥Ïä§Î•??ïÏù∏?òÏÑ∏??/p>
+                        </div>
+                
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* IT ?¥Ïä§ */}
+                    <div className="group bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 hover:bg-blue-100 transition-all duration-300 cursor-pointer border border-blue-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white text-lg">
+                          ?íª
+                      </div>
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">IT</span>
+                      </div>
+                      <h4 className="font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">AI Í∏∞Ïà† ?ÅÏã†</h4>
+                      <p className="text-sm text-gray-600 mb-3">ÏµúÏã† Í∏∞Ïà† ?∏Î†å?úÏ? ?ÅÏã† ?åÏãù</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">24Í∞??¥Ïä§</span>
+                        <button className="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                          Î≥¥Í∏∞ ??                        </button>
+                        </div>
+                      </div>
+
+                    {/* Í≤ΩÏ†ú ?¥Ïä§ */}
+                    <div className="group bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 hover:bg-green-100 transition-all duration-300 cursor-pointer border border-green-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center text-white text-lg">
+                          ?í∞
+                    </div>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Í≤ΩÏ†ú</span>
+                      </div>
+                      <h4 className="font-semibold text-gray-900 mb-2 group-hover:text-green-600 transition-colors">Í≤ΩÏ†ú ?ôÌñ•</h4>
+                      <p className="text-sm text-gray-600 mb-3">?úÏû• ?ôÌñ•Í≥??¨Ïûê ?ïÎ≥¥</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">18Í∞??¥Ïä§</span>
+                        <button className="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                          Î≥¥Í∏∞ ??                        </button>
+                      </div>
+                </div>
+                
+                    {/* ?§Ìè¨Ï∏??¥Ïä§ */}
+                    <div className="group bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-4 hover:bg-orange-100 transition-all duration-300 cursor-pointer border border-orange-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center text-white text-lg">
+                          ??                </div>
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">?§Ìè¨Ï∏?/span>
+                      </div>
+                      <h4 className="font-semibold text-gray-900 mb-2 group-hover:text-orange-600 transition-colors">?§Ìè¨Ï∏??åÏãù</h4>
+                      <p className="text-sm text-gray-600 mb-3">Íµ?Ç¥???§Ìè¨Ï∏??ÑÏû• ?åÏãù</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">15Í∞??¥Ïä§</span>
+                        <button className="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                          Î≥¥Í∏∞ ??                        </button>
+              </div>
+            </div>
+
+                    {/* ?¨Ìöå ?¥Ïä§ */}
+                    <div className="group bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 hover:bg-purple-100 transition-all duration-300 cursor-pointer border border-purple-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center text-white text-lg">
+                          ?èõÔ∏?                        </div>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">?¨Ìöå</span>
+                      </div>
+                      <h4 className="font-semibold text-gray-900 mb-2 group-hover:text-purple-600 transition-colors">?¨Ìöå ?¥Ïäà</h4>
+                      <p className="text-sm text-gray-600 mb-3">?¨Ìöå ?ÑÏïàÍ≥??ïÏ±Ö ?åÏãù</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">12Í∞??¥Ïä§</span>
+                        <button className="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                          Î≥¥Í∏∞ ??                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ?ìä ?§ÏãúÍ∞??¥Ïä§ ?µÍ≥Ñ */}
+            <div className="mt-12 mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <span className="text-2xl mr-3">?ìä</span>
+                  ?§ÏãúÍ∞??¥Ïä§ ?µÍ≥Ñ
+              </h2>
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span>LIVE ?ÖÎç∞?¥Ìä∏</span>
+                      </div>
+                    </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* ?§Îäò???¥Ïä§ Î∞úÌñâ??*/}
+                <div className="bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg p-6 text-white shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-2xl">?ì∞</div>
+                    <div className="text-xs bg-white/20 px-2 py-1 rounded-full">?§Îäò</div>
+                  </div>
+                  <div className="text-3xl font-bold mb-1">
+                    {loading ? (
+                      <div className="animate-pulse bg-purple-200 h-8 w-16 rounded"></div>
+                    ) : (
+                      <span className="animate-pulse">{Math.floor((news.length || 0) * 1.2)}</span>
+                    )}
+                        </div>
+                  <div className="text-sm opacity-90">?¥Ïä§ Î∞úÌñâ</div>
+                  <div className="text-xs mt-2 opacity-75">?ÑÏùº ?ÄÎπ?+12%</div>
+                      </div>
+
+                {/* Ïπ¥ÌÖåÍ≥†Î¶¨Î≥?Î∂ÑÌè¨ */}
+                <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg p-6 text-white shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-2xl">?ìä</div>
+                    <div className="text-xs bg-white/20 px-2 py-1 rounded-full">Î∂ÑÌè¨</div>
+                    </div>
+                  <div className="text-3xl font-bold mb-1 animate-pulse">IT</div>
+                  <div className="text-sm opacity-90">Í∞Ä??ÎßéÏ? ?¥Ïä§</div>
+                  <div className="text-xs mt-2 opacity-75">?ÑÏ≤¥??42%</div>
+                  </div>
+
+                {/* ?¨Ïö©???¥Î¶≠ */}
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg p-6 text-white shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-2xl">?ëÜ</div>
+                    <div className="text-xs bg-white/20 px-2 py-1 rounded-full">?¥Î¶≠</div>
+                  </div>
+                  <div className="text-3xl font-bold mb-1">
+                    {loading ? (
+                      <div className="animate-pulse bg-purple-200 h-8 w-16 rounded"></div>
+                    ) : (
+                      <span className="animate-pulse">952</span>
+                    )}
+                  </div>
+                  <div className="text-sm opacity-90">?§Îäò ?¥Î¶≠</div>
+                  <div className="text-xs mt-2 opacity-75">?âÍ∑† 2.3???¨Ïö©??/div>
+                </div>
+
+                {/* ?∏Í∏∞ ?§Ïõå??*/}
+                <div className="bg-gradient-to-br from-pink-500 to-purple-600 rounded-lg p-6 text-white shadow-lg">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-2xl">?î•</div>
+                    <div className="text-xs bg-white/20 px-2 py-1 rounded-full">??/div>
+                  </div>
+                  <div className="text-3xl font-bold mb-1 animate-pulse">AI</div>
+                  <div className="text-sm opacity-90">ÏµúÍ≥† ?∏Í∏∞ ?§Ïõå??/div>
+                  <div className="text-xs mt-2 opacity-75">+156% Ï¶ùÍ?</div>
+                </div>
+              </div>
+
+              {/* ?ÅÏÑ∏ ?µÍ≥Ñ */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <span className="text-lg mr-2">?ìà</span>
+                    ?¥Ïä§ ?∏Î†å??                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">IT ?¥Ïä§</span>
+                      <span className="font-medium text-purple-600">+15%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Í≤ΩÏ†ú ?¥Ïä§</span>
+                      <span className="font-medium text-indigo-600">+8%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">?§Ìè¨Ï∏??¥Ïä§</span>
+                      <span className="font-medium text-pink-600">-3%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <span className="text-lg mr-2">??/span>
+                    ?ΩÍ∏∞ ?®ÌÑ¥
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">?âÍ∑† ?ΩÍ∏∞ ?úÍ∞Ñ</span>
+                      <span className="font-medium">3.2Î∂?/span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Í∞Ä???úÎ∞ú???úÍ∞Ñ</span>
+                      <span className="font-medium">?§ÌõÑ 2??/span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Î™®Î∞î??ÎπÑÏú®</span>
+                      <span className="font-medium">68%</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <span className="text-lg mr-2">?éØ</span>
+                    ?¨Ïö©??Ï∞∏Ïó¨
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">?ìÍ? ?ëÏÑ±</span>
+                      <span className="font-medium text-purple-600">+23%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Í≥µÏú†?òÍ∏∞</span>
+                      <span className="font-medium text-indigo-600">+18%</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Ï¶êÍ≤®Ï∞æÍ∏∞</span>
+                      <span className="font-medium text-purple-600">+12%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ?éØ ÎßûÏ∂§ ?¥Ïä§ Ï∂îÏ≤ú */}
+            <div className="mt-12 mb-8 bg-gray-50 rounded-lg p-6">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-2 flex items-center justify-center">
+                  <span className="text-2xl mr-3">?éØ</span>
+                  ÎßûÏ∂§ ?¥Ïä§ Ï∂îÏ≤ú
+                </h2>
+                <p className="text-gray-600 text-sm">?πÏã†??Í¥Ä?¨ÏÇ¨??ÎßûÎäî ?¥Ïä§Î•?Ï∂îÏ≤ú?¥ÎìúÎ¶ΩÎãà??/p>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {loading || recommendations.length === 0 ? (
+                  // Î°úÎî© ?ÅÌÉú
+                  [...Array(4)].map((_, index) => (
+                    <div key={index} className="bg-white rounded-lg p-4 text-center shadow-sm border border-gray-200 animate-pulse">
+                      <div className="w-12 h-12 bg-purple-200 rounded-lg mx-auto mb-3"></div>
+                      <div className="h-4 bg-purple-200 rounded mb-1"></div>
+                      <div className="h-3 bg-purple-200 rounded w-2/3 mx-auto"></div>
+                    </div>
+                  ))
+                ) : (
+                  recommendations.map((item, index) => (
+                  <div key={index} className="bg-white rounded-lg p-4 text-center shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border border-gray-200">
+                    <div className={`w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-600 rounded-lg flex items-center justify-center mx-auto mb-3 shadow-lg`}>
+                      <span className="text-xl text-white">{item.icon}</span>
+                    </div>
+                    <h3 className="font-medium text-gray-900 mb-1">{item.category}</h3>
+                    <p className="text-xs text-gray-500">{item.count}</p>
+                  </div>
+                  ))
+                )}
+              </div>
+              
+              <div className="text-center mt-6">
+                <button className="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-600 text-white font-medium rounded hover:from-purple-600 hover:to-blue-700 transition-colors shadow-lg">
+                  ÎßûÏ∂§ ?§Ï†ï?òÍ∏∞
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+        
+        {/* ?∏ÌÑ∞Î•??ÑÌïú ?¨Î∞± */}
+        <div className="h-20"></div>
+    </div>
+    </>
+  );
+}
