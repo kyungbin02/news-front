@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Users, FileText, AlertCircle, TrendingUp, Bell } from 'lucide-react';
+import { BarChart3, Users, FileText, AlertCircle, Bell } from 'lucide-react';
 import { getToken } from '@/utils/token';
 import { getAdminNotifications } from '@/services/notificationService';
 import { Notification } from '@/types/notification';
@@ -13,7 +13,6 @@ export default function AdminDashboard() {
     totalUsers: 0,
     totalPosts: 0,
     totalReports: 0,
-    todayVisitors: 0,
     loading: true
   });
 
@@ -78,7 +77,6 @@ export default function AdminDashboard() {
         totalUsers,
         totalPosts,
         totalReports,
-        todayVisitors: 0, // 임시로 0 (추후 구현)
         loading: false
       });
 
@@ -140,8 +138,9 @@ export default function AdminDashboard() {
     fetchDashboardStats();
     fetchRecentNotifications();
   }, []);
-    return (
-          <div className="space-y-6">
+
+  return (
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">대시보드</h2>
@@ -172,7 +171,7 @@ export default function AdminDashboard() {
       </div>
 
             {/* 통계 카드 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
                 <div className="flex items-center">
@@ -239,27 +238,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-                <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
-                </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">오늘 방문자</dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {stats.loading ? (
-                      <div className="animate-pulse bg-gray-200 h-6 w-16 rounded"></div>
-                    ) : (
-                      stats.todayVisitors.toLocaleString()
-                    )}
-                  </dd>
-                </dl>
-                          </div>
-                        </div>
-                      </div>
-              </div>
+        
               </div>
 
       {/* 최근 알림 */}

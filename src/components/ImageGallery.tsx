@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 interface ImageGalleryProps {
   imageUrl: string | string[];
-  size?: 'small' | 'medium' | 'large' | 'custom'; // 크기 조절을 위한 props 추가
+  size?: 'small' | 'medium' | 'large' | 'custom' | 'card'; // 크기 조절을 위한 props 추가
 }
 
 export default function ImageGallery({ imageUrl, size = 'medium' }: ImageGalleryProps) {
@@ -14,13 +14,15 @@ export default function ImageGallery({ imageUrl, size = 'medium' }: ImageGallery
   const getSizeStyles = () => {
     switch (size) {
       case 'small':
-        return 'w-64 h-40'; // 기존 크기 (256x160px)
+        return 'w-full h-full'; // 전체 크기로 꽉 차게
       case 'medium':
         return 'w-96 h-60'; // 중간 크기 (384x240px)
       case 'large':
         return 'w-full h-full'; // 전체 크기로 꽉 차게
       case 'custom':
         return 'w-[800px] h-[500px]'; // 사용자 정의 크기 (800x500px)
+      case 'card':
+        return 'w-32 h-32'; // 카드용 크기 (정사각형 128x128px)
       default:
         return 'w-96 h-60'; // 기본값을 중간 크기로 변경
     }
@@ -56,11 +58,11 @@ export default function ImageGallery({ imageUrl, size = 'medium' }: ImageGallery
         <img 
           src={imageUrls[currentImageIndex].trim()} 
           alt={`칼럼 이미지 ${currentImageIndex + 1}`}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-cover"
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'cover',
             objectPosition: 'center center',
             display: 'block'
           }}
@@ -82,12 +84,12 @@ export default function ImageGallery({ imageUrl, size = 'medium' }: ImageGallery
         />
       ) : (
         <div 
-          className={`${getSizeStyles()} overflow-hidden ${size === 'large' ? '' : 'rounded-lg'} ${size === 'large' ? 'bg-black' : 'bg-gray-100'}`}
+          className={`${getSizeStyles()} overflow-hidden ${(size as string) === 'large' ? '' : 'rounded-lg'} ${(size as string) === 'large' ? 'bg-black' : 'bg-gray-100'}`}
         >
           <img 
             src={imageUrls[currentImageIndex].trim()} 
             alt={`칼럼 이미지 ${currentImageIndex + 1}`}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
             onError={(e) => {
               console.error('이미지 로드 실패:', imageUrls[currentImageIndex]);
               const imgElement = e.currentTarget;

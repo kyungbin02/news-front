@@ -4,18 +4,29 @@ import React, { useEffect, useState } from 'react';
 import { RSSArticle, fetchRSSNews } from '@/utils/rssApi';
 import { saveArticlesToStorage } from '@/utils/articleStorage';
 import { trackNewsClick } from '@/utils/popularNewsApi';
+import { trackSearch, searchNews, getPopularSearches } from '@/utils/searchApi';
 
 import Sidebar from "@/components/Sidebar";
 import Link from "next/link";
 
 export default function EconomyPage() {
   const [news, setNews] = useState<RSSArticle[]>([]);
+  const [allNews, setAllNews] = useState<RSSArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedNewsIndex, setSelectedNewsIndex] = useState(0);
+  const [stats, setStats] = useState({ totalNews: 0 });
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [searchModalKeyword, setSearchModalKeyword] = useState('');
+  const [searchModalLoading, setSearchModalLoading] = useState(false);
+  const [searchModalResults, setSearchModalResults] = useState<RSSArticle[]>([]);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchKeywords, setSearchKeywords] = useState<{keyword: string, count: number}[]>([]);
+  const [showMoreNews, setShowMoreNews] = useState(false);
   const articlesPerPage = 6;
 
+  // 현재 선택된 뉴스 가져오기
   const selectedNews = news.length > 0 ? news[selectedNewsIndex] : null;
 
   const handleNewsSelect = (index: number) => {
@@ -70,6 +81,61 @@ export default function EconomyPage() {
     }
   };
 
+  // 빠른 검색 클릭 핸들러
+  const handleQuickSearchClick = () => {
+    setShowSearchModal(true);
+  };
+
+  // 검색 모달 닫기
+  const handleSearchModalClose = () => {
+    setShowSearchModal(false);
+    setSearchModalKeyword('');
+    setSearchModalResults([]);
+  };
+
+  // 검색 모달에서 검색 실행
+  const handleSearchModalSearch = async () => {
+    if (searchModalKeyword.trim()) {
+      setSearchModalLoading(true);
+      try {
+        // 검색어 추적
+        await trackSearch(searchModalKeyword);
+        
+        // 실시간 검색어 업데이트
+        await loadSearchKeywords();
+        
+        // 로컬 검색 실행
+        const searchResults = searchNews(searchModalKeyword, allNews);
+        setSearchModalResults(searchResults);
+        
+      } catch (error) {
+        console.error('검색 실패:', error);
+        // 에러 시에도 로컬 검색 실행
+        const searchResults = searchNews(searchModalKeyword, allNews);
+        setSearchModalResults(searchResults);
+      } finally {
+        setSearchModalLoading(false);
+      }
+    }
+  };
+
+  // 인기 검색어 로딩
+  const loadSearchKeywords = async () => {
+    try {
+      const keywords = await getPopularSearches(8);
+      setSearchKeywords(keywords);
+    } catch (error) {
+      console.error('실시간 검색어 로드 실패:', error);
+    }
+  };
+
+  // 클라이언트에서만 통계 계산
+  useEffect(() => {
+    setStats({
+      totalNews: news.length
+    });
+  }, [news.length]);
+
   useEffect(() => {
     const loadNews = async () => {
       console.log('Starting to load RSS news...');
@@ -78,13 +144,62 @@ export default function EconomyPage() {
         console.log('Calling fetchRSSNews...');
         const newsData = await fetchRSSNews('economy', -1);
         console.log('Received RSS news data:', newsData);
-        setNews(newsData);
         
-        const totalPages = Math.ceil(newsData.length / articlesPerPage);
+        // 경제 관련 뉴스만 필터링 (적당한 수준)
+        const filteredNews = newsData.filter(article => {
+          const category = article.category?.toLowerCase();
+          const title = article.title?.toLowerCase() || '';
+          const description = article.description?.toLowerCase() || '';
+          const text = title + ' ' + description;
+          
+          // 경제 관련 키워드가 있으면 포함
+          const economyKeywords = [
+            '경제', '금융', '증권', '주식', '코스피', '코스닥', '환율', '원/달러',
+            '부동산', '아파트', '전세', '매매', '투자', '벤처', '스타트업',
+            '기업', '회사', '매출', '영업이익', '순이익', '실적', '배당',
+            '은행', '금리', '대출', '예금', '신용카드', '보험',
+            '정부', '정책', '세금', '예산', '국채', '공채',
+            '수출', '수입', '무역', 'FTA', '관세', '통상',
+            '인플레이션', '물가', 'CPI', 'GDP', '성장률',
+            '반도체', 'IT', '기술', '디지털', 'AI', '빅데이터',
+            '에너지', '석유', '가스', '전력', '신재생에너지',
+            '자동차', '조선', '철강', '화학', '바이오'
+          ];
+          
+          // 스포츠 관련 키워드가 있으면 제외
+          const sportsKeywords = [
+            '골프', '축구', '야구', '농구', '배구', '테니스', '올림픽', '월드컵',
+            '선수', '경기', '리그', '팀', '감독', '코치', '우승', '메달',
+            'K리그', 'KBO', '프리미어리그', '라리가', 'MLB', 'NBA'
+          ];
+          
+          // 스포츠 키워드가 있으면 제외
+          if (sportsKeywords.some(keyword => text.includes(keyword))) {
+            return false;
+          }
+          
+          // 경제 키워드가 있으면 포함
+          if (economyKeywords.some(keyword => text.includes(keyword))) {
+            return true;
+          }
+          
+          // 카테고리가 economy, economic, business면 포함
+          if (category === 'economy' || category === 'economic' || category === 'business') {
+            return true;
+          }
+          
+          return false;
+        });
+        
+        console.log('Filtered economy news:', filteredNews.length);
+        setNews(filteredNews);
+        setAllNews(filteredNews); // 전체 뉴스 저장
+        
+        const totalPages = Math.ceil(filteredNews.length / articlesPerPage);
         setTotalPages(totalPages);
         setCurrentPage(1);
         
-        saveArticlesToStorage(newsData);
+        saveArticlesToStorage(filteredNews);
       } catch (error) {
         console.error('Error in loadNews:', error);
       }
@@ -92,6 +207,7 @@ export default function EconomyPage() {
     };
 
     loadNews();
+    loadSearchKeywords();
   }, []);
 
   const getCurrentPageArticles = () => {
@@ -102,7 +218,6 @@ export default function EconomyPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const Pagination = () => {
@@ -156,9 +271,9 @@ export default function EconomyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20">
       {/* 전체 화면 동영상 배경 */}
-      <div className="fixed inset-0 z-0">
+      <div className="absolute inset-0 z-0 h-screen">
         <video
           autoPlay
           muted
@@ -167,7 +282,7 @@ export default function EconomyPage() {
           className="w-full h-full object-cover"
           poster="/image/news.webp"
         >
-          <source src="/video/3433789-hd_1920_1080_25fps.mp4" type="video/mp4" />
+          <source src="/video/economy.mp4" type="video/mp4" />
         </video>
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 via-green-900/80 to-teal-900/80"></div>
       </div>
@@ -186,7 +301,7 @@ export default function EconomyPage() {
               </h1>
               
               <p className="text-xl lg:text-2xl text-blue-100 mb-8 leading-relaxed">
-                글로벌 경제 동향과 시장 변화를 실시간으로 분석하고 전망합니다
+                주식, 부동산, 금융 등 모든 경제 분야의 생생한 현장과 분석을 실시간으로 만나보세요
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start items-center mb-8">
@@ -203,19 +318,58 @@ export default function EconomyPage() {
                   공유하기
                 </button>
               </div>
-              
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                  <div className="text-2xl font-bold text-white mb-1">1,847</div>
-                  <div className="text-blue-200 text-sm">경제 뉴스</div>
+
+              {/* 바로가기 아이콘들 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="group bg-gradient-to-br from-blue-500/20 to-purple-600/20 hover:from-blue-500/30 hover:to-purple-600/30 rounded-xl p-4 border border-blue-500/30 transition-all duration-300 cursor-pointer"
+                     onClick={() => window.scrollTo({ top: 1600, behavior: 'smooth' })}>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-lg">📰</span>
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">최신뉴스</div>
+                      <div className="text-blue-200 text-xs">실시간 업데이트</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                  <div className="text-2xl font-bold text-white mb-1">89</div>
-                  <div className="text-blue-200 text-sm">시장 분석</div>
+                
+                <div className="group bg-gradient-to-br from-orange-500/20 to-red-600/20 hover:from-orange-500/30 hover:to-red-600/30 rounded-xl p-4 border border-orange-500/30 transition-all duration-300 cursor-pointer"
+                     onClick={handleQuickSearchClick}>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-lg">🔍</span>
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">빠른검색</div>
+                      <div className="text-orange-200 text-xs">카테고리별</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                  <div className="text-2xl font-bold text-white mb-1">156</div>
-                  <div className="text-blue-200 text-sm">투자 전망</div>
+                
+                <div className="group bg-gradient-to-br from-purple-500/20 to-pink-600/20 hover:from-purple-500/30 hover:to-pink-600/30 rounded-xl p-4 border border-purple-500/30 transition-all duration-300 cursor-pointer"
+                     onClick={() => window.location.href = '/mypage/bookmarks'}>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-lg">⭐</span>
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">북마크</div>
+                      <div className="text-purple-200 text-xs">저장된 뉴스</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="group bg-gradient-to-br from-green-500/20 to-emerald-600/20 hover:from-green-500/30 hover:to-emerald-600/30 rounded-xl p-4 border border-green-500/30 transition-all duration-300 cursor-pointer">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-lg">📊</span>
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold text-sm">총 뉴스</div>
+                      <div className="text-green-200 text-xs">{stats.totalNews}개</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -234,7 +388,7 @@ export default function EconomyPage() {
               </div>
               
               <div className="space-y-3">
-                {(news.length > 0 ? news.slice(0, 5) : [
+                {(news.length > 0 ? news.slice(0, showMoreNews ? 10 : 5) : [
                   { 
                     rank: 1, 
                     title: "코스피 3000선 돌파, 외국인 매수세 지속", 
@@ -283,7 +437,12 @@ export default function EconomyPage() {
                       className={`group flex items-center justify-between p-3 rounded-xl transition-all duration-300 cursor-pointer ${
                         isSelected ? 'bg-white/15 border border-white/20' : 'hover:bg-white/10'
                       }`}
-                      onClick={() => isRealNews && handleNewsSelect(index)}
+                      onClick={() => {
+                        if (isRealNews && 'id' in item) {
+                          handleNewsClick(item as RSSArticle);
+                          window.location.href = `/news/${item.id}`;
+                        }
+                      }}
                     >
                       <div className="flex items-center space-x-3">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -309,16 +468,19 @@ export default function EconomyPage() {
               </div>
 
               <div className="mt-6 text-center">
-                <button className="text-[#e53e3e] hover:text-white transition-colors font-medium text-sm">
-                  더 많은 경제뉴스 보기 →
+                <button 
+                  onClick={() => setShowMoreNews(!showMoreNews)}
+                  className="text-[#e53e3e] hover:text-white transition-colors font-medium text-sm"
+                >
+                  {showMoreNews ? '뉴스 접기 ←' : '더 많은 경제뉴스 보기 →'}
                 </button>
               </div>
             </div>
-            </div>
           </div>
         </div>
+      </div>
 
-        {/* 뉴스 그리드 섹션 */}
+      {/* 뉴스 그리드 섹션 */}
         <div className="relative z-10 bg-white">
           <div className="container mx-auto px-4 py-16">
             <div className="flex gap-8">
@@ -462,6 +624,161 @@ export default function EconomyPage() {
           </div>
         </div>
       </div>
+
+      {/* 검색 모달 */}
+      {showSearchModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl transform transition-all duration-300 scale-100">
+            {/* 헤더 */}
+            <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-t-3xl p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold">빠른 검색</h2>
+                    <p className="text-orange-100 text-sm">원하는 뉴스를 검색해보세요</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSearchModalClose}
+                  className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 검색 입력 */}
+            <div className="p-6">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchModalKeyword}
+                  onChange={(e) => setSearchModalKeyword(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearchModalSearch()}
+                  placeholder="검색어를 입력하세요..."
+                  className="w-full px-6 py-4 text-lg border-2 border-gray-200 rounded-2xl focus:border-orange-500 focus:outline-none transition-colors"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSearchModalSearch}
+                  disabled={searchModalLoading}
+                  className="absolute right-2 top-2 bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-2 rounded-xl hover:from-orange-600 hover:to-red-700 transition-all duration-200 flex items-center space-x-2 disabled:opacity-50"
+                >
+                  {searchModalLoading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>검색</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              
+              {/* 인기 검색어 */}
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-600 mb-3">인기 검색어</h3>
+                <div className="flex flex-wrap gap-2">
+                  {searchKeywords.slice(0, 6).map((keyword, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setSearchModalKeyword(keyword.keyword);
+                        handleSearchModalSearch();
+                      }}
+                      className="px-4 py-2 bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-700 rounded-full text-sm transition-colors duration-200"
+                    >
+                      {keyword.keyword}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* 검색 결과 */}
+              {searchModalLoading && (
+                <div className="mt-6 text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+                  <p className="text-gray-600">검색 중...</p>
+                </div>
+              )}
+              
+              {searchModalResults.length > 0 && !searchModalLoading && (
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      검색 결과 ({searchModalResults.length}개)
+                    </h3>
+                    <button
+                      onClick={() => setSearchModalResults([])}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      결과 지우기
+                    </button>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto space-y-3">
+                    {searchModalResults.map((article, index) => (
+                      <div
+                        key={index}
+                        onClick={() => {
+                          handleNewsClick(article);
+                          window.location.href = `/news/${article.id}`;
+                        }}
+                        className="p-4 bg-gray-50 hover:bg-orange-50 rounded-xl cursor-pointer transition-colors duration-200 border border-gray-200 hover:border-orange-200"
+                      >
+                        <div className="flex items-start space-x-3">
+                          <img
+                            src={article.imageUrl || '/image/news.webp'}
+                            alt={article.title}
+                            className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = '/image/news.webp';
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 line-clamp-2 mb-1">
+                              {article.title}
+                            </h4>
+                            <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                              {article.description}
+                            </p>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <span>{article.source}</span>
+                              <span>
+                                {new Date(article.pubDate).toLocaleDateString('ko-KR', {
+                                  month: 'short',
+                                  day: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {searchModalResults.length === 0 && !searchModalLoading && searchModalKeyword && (
+                <div className="mt-6 text-center py-8">
+                  <div className="text-gray-400 text-4xl mb-3">🔍</div>
+                  <p className="text-gray-600">검색 결과가 없습니다</p>
+                  <p className="text-sm text-gray-500 mt-1">다른 검색어를 시도해보세요</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

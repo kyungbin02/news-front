@@ -2,22 +2,26 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Comment } from '@/types/comment';
-import { getComments, createComment, updateComment, deleteComment, toggleCommentLike, getCommentLikeCount, } from '@/utils/commentApi';
+import { getComments, createComment, updateComment, deleteComment, getReplies } from '@/utils/commentApi';
 import { ensureNewsExistsInBackend } from '@/utils/newsStorage';
 import { getArticleById } from '@/utils/articleStorage';
 
 type Props = {
   newsId: string | number;
+  onLoginRequired?: () => void;
 };
 
-export default function CommentSection({ newsId }: Props) {
+export default function CommentSection({ newsId, onLoginRequired }: Props) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState('');
   const [loading, setLoading] = useState(false);
-  const [likeCounts, setLikeCounts] = useState<Record<number, number>>({});
-  const [liked, setLiked] = useState<Set<number>>(new Set()); // 로컬 토글 상태
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [replies, setReplies] = useState<Record<number, Comment[]>>({});
+  const [openCommentActionMenu, setOpenCommentActionMenu] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const isAuthed = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -38,17 +42,38 @@ export default function CommentSection({ newsId }: Props) {
     );
   }, []);
 
+  // 현재 사용자 정보 가져오기
+  const loadCurrentUser = async () => {
+    try {
+      const token = localStorage.getItem('jwt_token');
+      if (!token) return;
+
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/api/user/info`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setCurrentUserId(result.userId);
+        }
+      }
+    } catch (error) {
+      console.error('사용자 정보 로드 실패:', error);
+    }
+  };
+
   async function load() {
     setLoading(true);
     try {
       const data = await getComments(newsId);
       setComments(data);
-      
-      // 초기 좋아요 수 로딩
-      const counts = await Promise.all(
-        data.map(async (c) => [c.commentId, await getCommentLikeCount(c.commentId)] as const)
-      );
-      setLikeCounts(Object.fromEntries(counts));
     } finally {
       setLoading(false);
     }
@@ -56,7 +81,23 @@ export default function CommentSection({ newsId }: Props) {
 
   useEffect(() => {
     load();
+    loadCurrentUser();
   }, [newsId]);
+
+  // 액션 메뉴 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('.action-menu')) {
+        setOpenCommentActionMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -88,8 +129,6 @@ export default function CommentSection({ newsId }: Props) {
       console.log('✅ 댓글 작성 성공:', created);
       setComments((prev) => [created, ...prev]);
       setNewComment('');
-      // 새로 만든 댓글의 좋아요 수 0으로 초기화
-      setLikeCounts((prev) => ({ ...prev, [created.commentId]: 0 }));
     } catch (err) {
       console.error('댓글 작성 중 오류:', err);
       alert('댓글 작성 실패. 로그인/권한을 확인해주세요.');
@@ -124,11 +163,20 @@ export default function CommentSection({ newsId }: Props) {
       const ok = await deleteComment(commentId);
       if (ok) {
         setComments((prev) => prev.filter((c) => c.commentId !== commentId));
-        setLikeCounts(({ [commentId]: _, ...rest }) => rest);
-        setLiked((prev) => {
-          const next = new Set(prev);
-          next.delete(commentId);
-          return next;
+        setReplies((prev) => {
+          const { [commentId]: _, ...rest } = prev;
+          return rest;
+        });
+        
+        // 대댓글인 경우 부모 댓글의 replies에서도 제거
+        setReplies((prev) => {
+          const newReplies = { ...prev };
+          Object.keys(newReplies).forEach(parentId => {
+            newReplies[Number(parentId)] = newReplies[Number(parentId)].filter(
+              reply => reply.commentId !== commentId
+            );
+          });
+          return newReplies;
         });
       } else {
         alert('삭제 권한이 없거나 실패했습니다.');
@@ -138,26 +186,42 @@ export default function CommentSection({ newsId }: Props) {
     }
   }
 
-  async function onToggleLike(commentId: number) {
+  async function onCreateReply(parentId: number) {
+    if (!replyContent.trim()) return;
+    setLoading(true);
     try {
-      const ok = await toggleCommentLike(commentId);
-      if (!ok) return;
+      console.log('💬 대댓글 작성 시작:', parentId);
       
-      const isLiked = liked.has(commentId);
-      setLiked((prev) => {
-        const next = new Set(prev);
-        if (isLiked) next.delete(commentId);
-        else next.add(commentId);
-        return next;
+      const created = await createComment({
+        newsId: newsId,
+        content: replyContent.trim(),
+        parentId: parentId
       });
       
-      setLikeCounts((prev) => ({
+      console.log('✅ 대댓글 작성 성공:', created);
+      setReplies((prev) => ({
         ...prev,
-        [commentId]: Math.max(0, (prev[commentId] ?? 0) + (isLiked ? -1 : 1)),
+        [parentId]: [...(prev[parentId] || []), created]
       }));
-    } catch (e) {
-      console.error(e);
-      alert('좋아요 처리 실패. 로그인/권한을 확인해주세요.');
+      setReplyContent('');
+      setReplyingTo(null);
+    } catch (err) {
+      console.error('대댓글 작성 중 오류:', err);
+      alert('대댓글 작성 실패. 로그인/권한을 확인해주세요.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadReplies(commentId: number) {
+    try {
+      const data = await getReplies(commentId);
+      setReplies((prev) => ({
+        ...prev,
+        [commentId]: data
+      }));
+    } catch (err) {
+      console.error('대댓글 로딩 실패:', err);
     }
   }
 
@@ -180,25 +244,43 @@ export default function CommentSection({ newsId }: Props) {
         </h3>
 
         {/* 댓글 작성 폼 */}
-        <form onSubmit={onCreate} className="mb-8">
-          <div className="flex gap-4">
-            <textarea
+        <div className="mb-6">
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              placeholder="댓글을 입력하세요..."
+              className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder={isAuthed ? '댓글을 입력하세요...' : '로그인 후 댓글 작성 가능합니다.'}
-              disabled={loading || !isAuthed}
-              rows={3}
-              className="flex-1 p-4 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  if (!isAuthed && onLoginRequired) {
+                    onLoginRequired();
+                    return;
+                  }
+                  onCreate(e);
+                }
+              }}
+              onClick={() => {
+                if (!isAuthed && onLoginRequired) {
+                  onLoginRequired();
+                }
+              }}
             />
-            <button
-              type="submit"
-              disabled={loading || !isAuthed || !newComment.trim()}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            <button 
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              onClick={(e) => {
+                if (!isAuthed && onLoginRequired) {
+                  onLoginRequired();
+                  return;
+                }
+                onCreate(e);
+              }}
             >
-              {loading ? '작성 중...' : '등록'}
+              작성
             </button>
           </div>
-        </form>
+        </div>
 
         {/* 댓글 목록 */}
         {loading && comments.length === 0 ? (
@@ -213,98 +295,226 @@ export default function CommentSection({ newsId }: Props) {
             <p className="text-gray-600">이 뉴스에 대한 여러분의 생각을 공유해주세요.</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {comments.map((c) => (
-              <div key={c.commentId} className="bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl p-6 border border-gray-200 hover:shadow-md transition-all duration-200">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                      {c.userName ? c.userName.charAt(0).toUpperCase() : 'U'}
-                    </div>
-                    <div>
-                      <div className="font-bold text-gray-900 text-lg">
-                        {c.userName || `사용자 ${c.userId}`}
+              <div key={c.commentId} className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-3">
+                        <span className="font-semibold text-gray-900">{c.userName || `사용자 ${c.userId}`}</span>
+                        <span className="text-sm text-gray-500">
+                          {fmt(c.createdAt)}
+                        </span>
                       </div>
-                      <div className="text-gray-500 text-sm">{fmt(c.createdAt)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                {editingId === c.commentId ? (
-                  <div className="space-y-4">
-                    <textarea
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      rows={3}
-                      className="w-full p-4 border border-gray-300 rounded-xl resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => onUpdate(c.commentId)}
-                        disabled={!editContent.trim()}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        저장
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingId(null);
-                          setEditContent('');
-                        }}
-                        type="button"
-                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                      >
-                        취소
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="text-gray-800 leading-relaxed text-lg whitespace-pre-wrap">
-                      {c.content}
+                      
+                      {/* 액션 메뉴 버튼 - 본인의 댓글에만 표시 */}
+                      {!editingId && currentUserId && c.userId === currentUserId && (
+                        <div className="relative action-menu">
+                          <button
+                            onClick={() => setOpenCommentActionMenu(openCommentActionMenu === c.commentId ? null : c.commentId)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+                          >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                            </svg>
+                          </button>
+                          
+                          {/* 액션 메뉴 드롭다운 */}
+                          {openCommentActionMenu === c.commentId && (
+                            <div className="absolute right-0 top-8 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                              <button
+                                onClick={() => {
+                                  setEditingId(c.commentId);
+                                  setEditContent(c.content);
+                                  setOpenCommentActionMenu(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => {
+                                  onDelete(c.commentId);
+                                  setOpenCommentActionMenu(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     
-                    <div className="flex items-center gap-4">
-                      <button
-                        type="button"
-                        onClick={() => onToggleLike(c.commentId)}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all duration-200 ${
-                          liked.has(c.commentId)
-                            ? 'bg-red-100 text-red-600 border border-red-200'
-                            : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-red-50 hover:text-red-600'
-                        }`}
-                      >
-                        <span className="text-lg">
-                          {liked.has(c.commentId) ? '❤️' : '🤍'}
-                        </span>
-                        <span className="font-medium">
-                          {likeCounts[c.commentId] ?? 0}
-                        </span>
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingId(c.commentId);
-                          setEditContent(c.content);
-                        }}
-                        className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all duration-200"
-                      >
-                        <span>✏️</span>
-                        <span>수정</span>
-                      </button>
-                      
-                      <button
-                        type="button"
-                        onClick={() => onDelete(c.commentId)}
-                        className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-200"
-                      >
-                        <span>🗑️</span>
-                        <span>삭제</span>
-                      </button>
-                    </div>
+                    {editingId === c.commentId ? (
+                      <div className="mb-3">
+                        <input
+                          type="text"
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="댓글을 입력하세요..."
+                        />
+                        <div className="flex items-center space-x-2 mt-2">
+                          <button
+                            onClick={() => onUpdate(c.commentId)}
+                            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                          >
+                            저장
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingId(null);
+                              setEditContent('');
+                            }}
+                            className="px-3 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600 transition-colors"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-700 mb-3">{c.content}</p>
+                    )}
+                    
+                    {/* 대댓글 작성 버튼 */}
+                    {!editingId && (
+                      <div className="mb-3">
+                        <button
+                          onClick={() => {
+                            if (!isAuthed && onLoginRequired) {
+                              onLoginRequired();
+                              return;
+                            }
+                            if (replies[c.commentId]) {
+                              setReplyingTo(null);
+                            } else {
+                              setReplyingTo(c.commentId);
+                              loadReplies(c.commentId);
+                            }
+                          }}
+                          className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                        >
+                          💬 답글 작성
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* 대댓글 작성 입력창 */}
+                    {replyingTo === c.commentId && (
+                      <div className="mb-3 ml-6 border-l-2 border-blue-200 pl-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            placeholder="대댓글을 입력하세요..."
+                            value={replyContent}
+                            onChange={(e) => setReplyContent(e.target.value)}
+                            className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                if (!isAuthed && onLoginRequired) {
+                                  onLoginRequired();
+                                  return;
+                                }
+                                onCreateReply(c.commentId);
+                              }
+                            }}
+                            onClick={() => {
+                              if (!isAuthed && onLoginRequired) {
+                                onLoginRequired();
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              if (!isAuthed && onLoginRequired) {
+                                onLoginRequired();
+                                return;
+                              }
+                              onCreateReply(c.commentId);
+                            }}
+                            className="px-3 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                          >
+                            작성
+                          </button>
+                          <button
+                            onClick={() => {
+                              setReplyingTo(null);
+                              setReplyContent('');
+                            }}
+                            className="px-3 py-2 bg-gray-500 text-white text-sm rounded hover:bg-gray-600 transition-colors"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 대댓글 목록 */}
+                    {replies[c.commentId] && replies[c.commentId].length > 0 && (
+                      <div className="ml-6 space-y-3 border-l-2 border-blue-200 pl-4 mt-3">
+                        {replies[c.commentId].map((reply) => (
+                          <div key={reply.commentId} className="bg-white rounded p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-3">
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {reply.userName || `사용자 ${reply.userId}`}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {fmt(reply.createdAt)}
+                                </span>
+                              </div>
+                              
+                              {/* 대댓글 액션 메뉴 버튼 - 본인의 댓글에만 표시 */}
+                              {currentUserId && reply.userId === currentUserId && (
+                                <div className="relative action-menu">
+                                <button
+                                  onClick={() => setOpenCommentActionMenu(openCommentActionMenu === reply.commentId ? null : reply.commentId)}
+                                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
+                                >
+                                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                  </svg>
+                                </button>
+                                
+                                {/* 대댓글 액션 메뉴 드롭다운 */}
+                                {openCommentActionMenu === reply.commentId && (
+                                  <div className="absolute right-0 top-6 w-28 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                                    <button
+                                      onClick={() => {
+                                        setEditingId(reply.commentId);
+                                        setEditContent(reply.content);
+                                        setOpenCommentActionMenu(null);
+                                      }}
+                                      className="w-full text-left px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 transition-colors"
+                                    >
+                                      수정
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        onDelete(reply.commentId);
+                                        setOpenCommentActionMenu(null);
+                                      }}
+                                      className="w-full text-left px-2 py-1 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                                    >
+                                      삭제
+                                    </button>
+                                  </div>
+                                )}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-gray-700 text-sm">
+                              {reply.content}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>

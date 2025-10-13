@@ -7,6 +7,7 @@ import SignupModal from './SignupModal';
 import NotificationDropdown from './NotificationDropdown';
 import Link from 'next/link';
 import { getToken, setToken, removeToken } from '@/utils/token';
+import { checkAndShowUserStatusAlert } from '@/utils/userStatus';
 
 export default function StandardHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -68,6 +69,15 @@ export default function StandardHeader() {
         if (userData.isAuthenticated) {
           console.log("사용자 인증 성공. UI를 업데이트합니다. 사용자 이름:", userData.username);
           setUser({ name: userData.username });
+          
+          // 사용자 상태 확인 (정지 여부 체크)
+          const isSuspended = await checkAndShowUserStatusAlert();
+          if (isSuspended) {
+            // 정지된 사용자는 로그아웃 처리
+            setUser(null);
+            removeToken();
+            return;
+          }
         } else {
           console.log("백엔드에서 인증 실패 응답. 토큰을 삭제하고 로그아웃 처리합니다.");
           removeToken();
@@ -247,6 +257,14 @@ export default function StandardHeader() {
             <ul className="flex space-x-8">
               <li>
                 <Link
+                  href="/general"
+                  className="font-medium text-gray-800 hover:text-[#e53e3e] transition-colors duration-300"
+                >
+                  전체
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/economy"
                   className="font-medium text-gray-800 hover:text-[#e53e3e] transition-colors duration-300"
                 >
@@ -259,14 +277,6 @@ export default function StandardHeader() {
                   className="font-medium text-gray-800 hover:text-[#e53e3e] transition-colors duration-300"
                 >
                   스포츠
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/it"
-                  className="font-medium text-gray-800 hover:text-[#e53e3e] transition-colors duration-300"
-                >
-                  IT
                 </Link>
               </li>
               <li>

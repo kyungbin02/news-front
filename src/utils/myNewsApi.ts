@@ -65,8 +65,7 @@ export async function getBookmarks(): Promise<Bookmark[]> {
     });
     
     if (response.status === 401) {
-      // 로그인 페이지로 리다이렉트
-      window.location.href = '/login';
+      console.log('🔍 로그인되지 않은 사용자 - 빈 북마크 목록 반환');
       return [];
     }
     
@@ -118,7 +117,7 @@ export async function addBookmark(newsId: string, newsTitle: string, category: s
     console.log('📌 북마크 추가 응답:', response.status, response.statusText);
     
     if (response.status === 401) {
-      window.location.href = '/login';
+      console.log('🔍 로그인이 필요합니다 - 북마크 추가 실패');
       return false;
     }
     
@@ -151,7 +150,7 @@ export async function removeBookmark(bookmarkId: number): Promise<boolean> {
     console.log('🗑️ 북마크 삭제 응답:', response.status, response.statusText);
     
     if (response.status === 401) {
-      window.location.href = '/login';
+      console.log('🔍 로그인이 필요합니다');
       return false;
     }
     
@@ -185,7 +184,7 @@ export async function checkBookmark(newsId: string): Promise<{ isBookmarked: boo
     console.log('🔍 북마크 확인 응답:', response.status, response.statusText);
     
     if (response.status === 401) {
-      window.location.href = '/login';
+      console.log('🔍 로그인되지 않은 사용자 - 북마크 상태는 false로 설정');
       return { isBookmarked: false };
     }
     
@@ -258,7 +257,7 @@ export async function getViewHistory(): Promise<ViewHistory[]> {
     });
     
     if (response.status === 401) {
-      window.location.href = '/login';
+      console.log('🔍 로그인이 필요합니다');
       return [];
     }
     
@@ -328,7 +327,7 @@ export async function addViewHistory(newsId: string, newsTitle: string, category
     });
     
     if (response.status === 401) {
-      window.location.href = '/login';
+      console.log('🔍 로그인이 필요합니다');
       return false;
     }
     
@@ -356,7 +355,7 @@ export async function getMyComments(): Promise<MyComment[]> {
     
     if (response.status === 401) {
       console.log('❌ 인증 실패 - 로그인 페이지로 이동');
-      window.location.href = '/login';
+      console.log('🔍 로그인이 필요합니다');
       return [];
     }
     
@@ -481,7 +480,7 @@ export async function getUserStats(): Promise<{
     });
     
     if (response.status === 401) {
-      window.location.href = '/login';
+      console.log('🔍 로그인이 필요합니다');
       return {
         totalBookmarks: 0,
         totalViews: 0,

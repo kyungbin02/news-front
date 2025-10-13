@@ -14,6 +14,7 @@ import {
   Inquiry
 } from "@/utils/myNewsApi";
 import { getToken, removeToken, isTokenValid } from "@/utils/token";
+import LoginModal from "@/components/LoginModal";
 
 export default function MyPage() {
   // 상태 관리
@@ -22,6 +23,7 @@ export default function MyPage() {
   const [myComments, setMyComments] = useState<MyComment[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   
   // 문의사항 모달 상태
   const [isInquiryModalOpen, setIsInquiryModalOpen] = useState(false);
@@ -29,6 +31,10 @@ export default function MyPage() {
   const [inquiryContent, setInquiryContent] = useState('');
   const [expandedInquiry, setExpandedInquiry] = useState<number | null>(null);
   const [showQuickMenu, setShowQuickMenu] = useState(false);
+  
+  // 로그인 모달 상태
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
   
   // 문의사항 로드 함수 - 고객센터와 동일한 API 사용
   const loadInquiries = async () => {
@@ -210,11 +216,15 @@ export default function MyPage() {
     }
   };
   
-  // 사용자 정보
+  // 사용자 정보 - 백업 파일의 상세한 프로필 기능 추가
   const [user, setUser] = useState<{
     name: string;
-    email: string;
-    createdAt: string;
+    username?: string;
+    email?: string;
+    sns_type?: string;
+    user_id?: number;
+    joinDate?: string;
+    profileImg?: string;
   } | null>(null);
 
   // 카테고리 한글 변환 함수
@@ -289,6 +299,64 @@ export default function MyPage() {
     return { recentNews, recentComments };
   };
 
+  // 사용자 정보 로드 - 백업 파일의 상세한 프로필 기능 추가
+  const loadUserInfo = async () => {
+    try {
+      // Header와 동일한 방식으로 토큰 가져오기
+      const token = getToken();
+      console.log("🔍 토큰 존재 여부:", token ? "있음" : "없음");
+      console.log("🔍 토큰 값:", token ? `${token.substring(0, 20)}...` : "null");
+      
+      if (!token) {
+        console.log("❌ 토큰이 없어서 사용자 정보를 가져올 수 없습니다.");
+        return;
+      }
+
+      console.log("📡 새로운 사용자 정보 API 호출 시작: /api/user/info");
+      const apiUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      const response = await fetch(`${apiUrl}/api/user/info`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      console.log("📡 API 응답 상태:", response.status);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("📡 백엔드 응답 전체:", result);
+        
+        if (result.success) {
+          console.log("✅ 사용자 정보 파싱 성공:", result);
+          
+          setUser({
+            name: result.username,
+            username: result.username,
+            email: result.email || `${result.snsType} 로그인`,
+            sns_type: result.snsType,
+            user_id: result.userId,
+            joinDate: result.createdAt ? new Date(result.createdAt).toLocaleDateString('ko-KR') : "정보 없음",
+            profileImg: result.profileImg
+          });
+          
+          console.log("✅ 사용자 상태 업데이트 완료");
+        } else {
+          console.error("❌ API 응답에서 success가 false:", result);
+        }
+      } else {
+        console.error("❌ 사용자 정보 API 호출 실패:", response.status);
+        const errorText = await response.text();
+        console.error("❌ 에러 응답 내용:", errorText);
+      }
+    } catch (error) {
+      console.error("❌ 사용자 정보 로드 중 오류:", error);
+    }
+  };
+
   // 데이터 로드
   const loadData = async () => {
     setLoading(true);
@@ -299,40 +367,24 @@ export default function MyPage() {
         return;
       }
 
-      // 사용자 정보 로드
-      const userResponse = await fetch('http://localhost:8080/api/user', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // 사용자 정보와 마이페이지 데이터를 병렬로 로드
+      await Promise.all([
+        loadUserInfo(),
+        (async () => {
+          const [bookmarksData, historyData, commentsData] = await Promise.all([
+            getBookmarks(),
+            getViewHistory(),
+            getMyComments()
+          ]);
 
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        if (userData.isAuthenticated) {
-          setUser({
-            name: userData.username || userData.name || '사용자',
-            email: userData.email || 'user@example.com',
-            createdAt: userData.createdAt || new Date().toISOString()
-          });
-        }
-      }
-
-      // 병렬로 데이터 로드
-      const [bookmarksData, historyData, commentsData] = await Promise.all([
-        getBookmarks(),
-        getViewHistory(),
-        getMyComments()
+          setBookmarks(bookmarksData);
+          setViewHistory(historyData);
+          setMyComments(commentsData);
+          
+          // 문의사항은 별도로 로드 (고객센터와 동일한 API 사용)
+          loadInquiries();
+        })()
       ]);
-
-      setBookmarks(bookmarksData);
-      setViewHistory(historyData);
-      setMyComments(commentsData);
-      
-      // 문의사항은 별도로 로드 (고객센터와 동일한 API 사용)
-      loadInquiries();
 
     } catch (error) {
       console.error('데이터 로드 실패:', error);
@@ -398,20 +450,58 @@ export default function MyPage() {
     }
   };
 
+  // 로그인 상태 확인
   useEffect(() => {
-    loadData();
+    const token = getToken();
+    if (token && isTokenValid(token)) {
+      setIsLoggedIn(true);
+      loadData();
+    } else {
+      setIsLoggedIn(false);
+      setShowLoginModal(true);
+      setLoading(false);
+    }
   }, []);
 
+  // 로그인 성공 핸들러
+  const handleLoginSuccess = (userData: { name: string }) => {
+    console.log('로그인 성공:', userData);
+    setIsLoggedIn(true);
+    setShowLoginModal(false);
+    // 로그인 후 데이터 다시 로드
+    loadData();
+  };
+
+  // 회원가입 모달 열기
+  const handleSignupClick = () => {
+    setShowLoginModal(false);
+    setShowSignupModal(true);
+  };
+
   if (loading) {
-                        return (
+    return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                            <div className="text-center">
+        <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#e53e3e] mx-auto mb-4"></div>
           <p className="text-gray-600">로딩 중...</p>
-                            </div>
-                          </div>
-                        );
-                      }
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인하지 않은 경우 로그인 모달 표시
+  if (!isLoggedIn) {
+    return (
+      <>
+        <LoginModal
+          isOpen={showLoginModal}
+          onClose={() => window.history.back()}
+          onSignupClick={handleSignupClick}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      </>
+    );
+  }
                       
                       return (
     <div className="min-h-screen bg-gray-50">
@@ -439,7 +529,7 @@ export default function MyPage() {
                   
                   {/* 가입일 */}
                   <div className="text-xs text-gray-500">
-                    가입일: {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : '2024.01.01'}
+                    가입일: {user?.joinDate || '2024.01.01'}
                               </div>
                             </div>
                           </div>
@@ -471,9 +561,6 @@ export default function MyPage() {
                       </Link>
                       <Link href="/mypage/comments" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
                         💬 내 댓글 ({myComments?.length || 0})
-                      </Link>
-                      <Link href="/mypage/preferences" className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                        ⚙️ 관심사 설정
                       </Link>
                     </nav>
                   </div>
@@ -826,13 +913,19 @@ export default function MyPage() {
                                 <div className="bg-white p-3 rounded-lg border">
                                   <div className="flex items-center text-sm text-gray-600 mb-2">
                                     <span className="font-semibold mr-2">관리자:</span>
-                                    <span>{inquiry.adminUsername || '관리자'}</span>
-                                    <span className="ml-auto">{inquiry.answeredAt ? new Date(inquiry.answeredAt).toLocaleDateString('ko-KR') : ''}</span>
+                                    <span>{(inquiry as any).adminUsername || '관리자'}</span>
+                                    <span className="ml-auto">{inquiry.answeredAt ? new Date(inquiry.answeredAt).toLocaleDateString('ko-KR') : '정보 없음'}</span>
                                     </div>
                                   <p className="text-gray-800 text-sm whitespace-pre-wrap">{inquiry.answer}</p>
                                 </div>
                               </div>
-                                ) : (
+                            ) : inquiry.status === 'answered' ? (
+                              <div className="py-4">
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                  <p className="text-blue-800 text-sm">답변은 완료되었지만 내용을 불러올 수 없습니다. 관리자에게 문의해주세요.</p>
+                                </div>
+                              </div>
+                            ) : (
                               <div className="py-4">
                                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                                   <p className="text-yellow-800 text-sm">⏳ 답변 대기 중입니다. 빠른 시일 내에 답변드리겠습니다.</p>

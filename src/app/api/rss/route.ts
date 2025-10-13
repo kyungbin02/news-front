@@ -12,101 +12,30 @@ const CACHE_DURATION = 10 * 60 * 1000; // 10분 캐시
 const failedFeeds = new Map<string, number>();
 const RETRY_DELAY = 5 * 60 * 1000; // 5분 후 재시도
 
-// RSS 피드 URL 목록 (검증된 안정적인 언론사들만)
-const RSS_FEEDS = {
-  it: [
-    // 동아일보 (안정적, 이미지 품질 좋음)
-    'https://rss.donga.com/economy.xml',
-    'https://rss.donga.com/science.xml',
-    'https://rss.donga.com/culture.xml',
-    'https://rss.donga.com/national.xml',
-    'https://rss.donga.com/international.xml',
-    'https://rss.donga.com/politics.xml',
-    
-    // 한겨레 (안정적, 이미지 품질 좋음)
-    'https://www.hani.co.kr/rss/economy/',
-    'https://www.hani.co.kr/rss/society/',
-    'https://www.hani.co.kr/rss/politics/',
-    'https://www.hani.co.kr/rss/international/',
-    
-    // 조선일보 (안정적, 이미지 품질 우수)
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/economy/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/international/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/national/?outputType=xml',
-    
-    // 연합뉴스 (안정적인 피드만)
-    'https://www.yna.co.kr/rss/economy.xml',
-    'https://www.yna.co.kr/rss/politics.xml',
-    'https://www.yna.co.kr/rss/international.xml',
-    
-    // SBS (안정적, 이미지 품질 좋음)
-    'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER',
-    'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=02&plink=RSSREADER',
-    'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=03&plink=RSSREADER'
-  ],
+// RSS 피드 URL 목록 (백엔드에서 자동 카테고리 분류)
+const ALL_RSS_FEEDS = [
+  // General (전체/종합)
+  'https://rss.donga.com/total.xml',
+  'https://rss.joins.com/joins_news_list.xml',
   
-  sports: [
-    // 동아일보 스포츠 (안정적)
-    'https://rss.donga.com/sports.xml',
-    'https://rss.donga.com/culture.xml',
-    'https://rss.donga.com/national.xml',
-    'https://rss.donga.com/international.xml',
-    
-    // 한겨레 스포츠 (안정적)
-    'https://www.hani.co.kr/rss/sports/',
-    'https://www.hani.co.kr/rss/society/',
-    'https://www.hani.co.kr/rss/culture/',
-    'https://www.hani.co.kr/rss/international/',
-    
-    // 조선일보 스포츠 (안정적)
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/sports/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/international/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/national/?outputType=xml',
-    
-    // 연합뉴스 스포츠 (안정적인 피드만)
-    'https://www.yna.co.kr/rss/sports.xml',
-    'https://www.yna.co.kr/rss/international.xml',
-    
-    // SBS 스포츠 (안정적)
-    'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=07&plink=RSSREADER',
-    'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER'
-  ],
+  // Economy (경제)
+  'https://rss.donga.com/economy.xml',
   
-  economy: [
-    // 동아일보 경제 (안정적)
-    'https://rss.donga.com/economy.xml',
-    'https://rss.donga.com/politics.xml',
-    'https://rss.donga.com/national.xml',
-    'https://rss.donga.com/international.xml',
-    'https://rss.donga.com/science.xml',
-    
-    // 한겨레 경제 (안정적)
-    'https://www.hani.co.kr/rss/economy/',
-    'https://www.hani.co.kr/rss/politics/',
-    'https://www.hani.co.kr/rss/society/',
-    'https://www.hani.co.kr/rss/international/',
-    
-    // 조선일보 경제 (안정적)
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/economy/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/politics/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/international/?outputType=xml',
-    'https://www.chosun.com/arc/outboundfeeds/rss/category/national/?outputType=xml',
-    
-    // 연합뉴스 경제 (안정적인 피드만)
-    'https://www.yna.co.kr/rss/economy.xml',
-    'https://www.yna.co.kr/rss/politics.xml',
-    'https://www.yna.co.kr/rss/international.xml',
-    
-    // SBS 경제 (안정적)
-    'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=02&plink=RSSREADER',
-    'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER'
-  ]
-};
+  // Sports (스포츠)
+  'https://rss.donga.com/sports.xml'
+];
 
-// 카테고리별 키워드 필터링
+// 백엔드 카테고리 분류 로직과 동일한 함수
+function determineCategoryFromUrl(url: string): string {
+  if (url.includes('sports')) return 'sports';
+  if (url.includes('economy')) return 'economy';
+  if (url.includes('total') || url.includes('joins.com')) return 'general';
+  return 'general'; // 기본값
+}
+
+// 카테고리별 키워드 필터링 (백엔드와 동일한 분류 사용)
 const CATEGORY_KEYWORDS = {
-  it: ['IT', '기술', '테크', '디지털', '인공지능', 'AI', '소프트웨어', '하드웨어', '컴퓨터', '인터넷', '모바일', '앱', '게임', '스마트폰', '반도체', '전자', '통신', '5G', '클라우드', '빅데이터', '블록체인', '메타버스', 'VR', 'AR'],
+  general: ['전체', '종합', '뉴스', '일반', '사회', '정치', '국제', '국내'],
   sports: ['스포츠', '축구', '야구', '농구', '배구', '테니스', '골프', '올림픽', '월드컵', '선수', '경기', '리그', '팀', '감독', '코치', '훈련', '경기장', '승부', '우승', '메달', '기록'],
   economy: ['경제', '금융', '증시', '주식', '투자', '기업', '산업', '무역', '수출', '수입', 'GDP', '인플레이션', '금리', '환율', '부동산', '채권', '펀드', '은행', '보험', '재정', '예산', '세금', '일자리', '고용']
 };
@@ -367,13 +296,20 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    const feeds = RSS_FEEDS[category as keyof typeof RSS_FEEDS] || RSS_FEEDS.it;
-    console.log(`Processing ${feeds.length} RSS feeds for category: ${category}`);
+    // 백엔드 카테고리 분류 로직을 사용하여 해당 카테고리에 맞는 피드만 필터링
+    const relevantFeeds = ALL_RSS_FEEDS.filter(feedUrl => {
+      const determinedCategory = determineCategoryFromUrl(feedUrl);
+      return determinedCategory === category;
+    });
     
-    // 모든 RSS 피드를 병렬로 처리
-    const feedPromises = feeds.map(async (feedUrl) => {
+    console.log(`Processing ${relevantFeeds.length} RSS feeds for category: ${category}`);
+    console.log(`Relevant feeds:`, relevantFeeds);
+    
+    // 해당 카테고리에 맞는 RSS 피드를 병렬로 처리
+    const feedPromises = relevantFeeds.map(async (feedUrl) => {
       const sourceName = new URL(feedUrl).hostname.replace('www.', '').replace('rss.', '');
-      return await fetchRSSFeed(feedUrl, sourceName, category);
+      const determinedCategory = determineCategoryFromUrl(feedUrl);
+      return await fetchRSSFeed(feedUrl, sourceName, determinedCategory);
     });
     
     const feedResults = await Promise.allSettled(feedPromises);

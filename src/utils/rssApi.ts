@@ -4,6 +4,7 @@ export interface RSSArticle {
   title: string;
   description: string;
   link: string;
+  url?: string; // 원문 URL 추가
   pubDate: string;
   source: string;
   category: string;

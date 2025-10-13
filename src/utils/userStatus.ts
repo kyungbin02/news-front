@@ -109,6 +109,7 @@ export const checkUserStatus = async (): Promise<UserStatus | null> => {
 };
 
 // 경고/정지 상태 확인 및 알림 표시
+// 반환값: true = 로그인 차단 (정지), false = 로그인 허용 (경고 또는 정상)
 export const checkAndShowUserStatusAlert = async (): Promise<boolean> => {
   try {
     console.log('🔍 사용자 상태 알림 확인 시작');
@@ -127,7 +128,7 @@ export const checkAndShowUserStatusAlert = async (): Promise<boolean> => {
         `서비스 이용 시 주의해주세요.`;
       
       alert(message);
-      return true;
+      return false; // 경고는 로그인 허용
     }
 
     // 정지 상태인 경우

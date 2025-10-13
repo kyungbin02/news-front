@@ -69,8 +69,51 @@ export async function GET(
       );
     }
     
-    // 1. 임시 데이터베이스에서 먼저 찾기
-    let newsData = mockNewsDatabase[id];
+    // 1. 실제 MySQL 데이터베이스에서 찾기
+    let newsData = null;
+    try {
+      console.log('🔍 MySQL 데이터베이스에서 뉴스 검색 중...');
+      
+      // 실제 DB 연결 (환경변수에서 설정)
+      const mysql = require('mysql2/promise');
+      const connection = await mysql.createConnection({
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 3306,
+        user: process.env.DB_USER || 'myapp',
+        password: process.env.DB_PASSWORD || '1111',
+        database: process.env.DB_NAME || 'myapp'
+      });
+      
+      // 뉴스 조회 쿼리
+      const [rows] = await connection.execute(
+        'SELECT news_id, title, content, category, image_url, views, created_at, updated_at, source, url, published_at FROM news WHERE news_id = ?',
+        [parseInt(id)]
+      );
+      
+      await connection.end();
+      
+      if (rows && rows.length > 0) {
+        const row = rows[0];
+        newsData = {
+          newsId: row.news_id,
+          title: row.title,
+          content: row.content,
+          category: row.category,
+          imageUrl: row.image_url,
+          views: row.views,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+          source: row.source,
+          url: row.url,
+          publishedAt: row.published_at
+        };
+        console.log('✅ MySQL에서 뉴스 데이터 찾음:', newsData.title);
+      } else {
+        console.log('❌ MySQL에서 뉴스 데이터 없음');
+      }
+    } catch (error) {
+      console.error('❌ MySQL 연결 오류:', error);
+    }
     
     // 2. RSS 데이터에서 찾기 (백업)
     if (!newsData) {

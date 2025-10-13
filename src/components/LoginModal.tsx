@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import { getAuthHeader, setToken } from "@/utils/token";
+import { checkAndShowUserStatusAlert } from "@/utils/userStatus";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -43,17 +44,25 @@ const LoginModal: React.FC<LoginModalProps> = ({
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const userData = await response.json();
-          if (userData.isAuthenticated) {
-            if (userData.token) {
-              // 중괄호 제거하여 순수한 JWT 토큰만 저장
-              const cleanToken = userData.token.replace(/[{}]/g, '');
-              console.log("백엔드에서 받은 토큰:", userData.token);
-              console.log("정리된 토큰:", cleanToken);
-              setToken(cleanToken);
+            if (userData.isAuthenticated) {
+              if (userData.token) {
+                // 중괄호 제거하여 순수한 JWT 토큰만 저장
+                const cleanToken = userData.token.replace(/[{}]/g, '');
+                console.log("백엔드에서 받은 토큰:", userData.token);
+                console.log("정리된 토큰:", cleanToken);
+                setToken(cleanToken);
+              }
+              
+              // 사용자 상태 확인 (정지 여부 체크)
+              const isSuspended = await checkAndShowUserStatusAlert();
+              if (isSuspended) {
+                // 정지된 사용자는 로그인 성공하지 않음
+                return;
+              }
+              
+              onLoginSuccess({ name: userData.name });
+              onClose();
             }
-            onLoginSuccess({ name: userData.name });
-            onClose();
-          }
         }
       } catch (error) {
         console.error("Error fetching user data:", error);

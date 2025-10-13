@@ -242,12 +242,20 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
   const handleReportBoard = () => {
     if (!column) return;
     
+    console.log('🚨 게시물 신고 정보:', {
+      columnId: column.id,
+      title: column.title,
+      content: column.content,
+      author: column.author,
+      userId: column.user_id
+    });
+    
     setSelectedTargetForReport({
       type: 'board',
       id: column.id,
       title: column.title,
       content: column.content,
-      userId: column.user_id
+      userId: column.user_id || 1 // 임시로 기본값 설정
     });
     setShowReportModal(true);
   };
@@ -282,12 +290,24 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
       
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
       
+      const reportData = {
+        reported_user_id: selectedTargetForReport.userId,
+        report_reason: selectedReportReason,
+        report_content: reportAdditionalComment || '',
+        target_type: selectedTargetForReport.type === 'board' ? 'board' : 'board_comment',
+        target_id: selectedTargetForReport.type === 'board' ? selectedTargetForReport.id : columnId, // 게시물인 경우 게시물 ID, 댓글인 경우 게시물 ID
+        comment_id: selectedTargetForReport.type === 'comment' ? selectedTargetForReport.id : null, // 댓글인 경우 댓글 ID
+        target_title: selectedTargetForReport.title || selectedTargetForReport.content, // 게시글 제목 또는 댓글 내용
+        target_content: selectedTargetForReport.content // 게시글/댓글 내용
+      };
+      
       console.log('🚨 신고 정보:', {
         targetType: selectedTargetForReport.type,
         targetId: selectedTargetForReport.id,
         reason: selectedReportReason,
         additionalComment: reportAdditionalComment,
-        reporterToken: token ? `${token.substring(0, 20)}...` : '없음'
+        reporterToken: token ? `${token.substring(0, 20)}...` : '없음',
+        reportData: reportData
       });
       
       // 실제 신고 API 호출
@@ -297,16 +317,7 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          reported_user_id: selectedTargetForReport.userId,
-          report_reason: selectedReportReason,
-          report_content: reportAdditionalComment || '',
-          target_type: selectedTargetForReport.type === 'board' ? 'board' : 'board_comment',
-          target_id: selectedTargetForReport.type === 'board' ? selectedTargetForReport.id : columnId, // 게시물인 경우 게시물 ID, 댓글인 경우 게시물 ID
-          comment_id: selectedTargetForReport.type === 'comment' ? selectedTargetForReport.id : null, // 댓글인 경우 댓글 ID
-          target_title: selectedTargetForReport.title || selectedTargetForReport.content, // 게시글 제목 또는 댓글 내용
-          target_content: selectedTargetForReport.content // 게시글/댓글 내용
-        })
+        body: JSON.stringify(reportData)
       });
       
       console.log('🔍 API 응답 상태:', response.status, response.statusText);
@@ -335,9 +346,27 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
           setReportAdditionalComment('');
         }
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('신고 접수 실패:', response.status, errorData);
-        alert(`신고 접수에 실패했습니다: ${errorData.message || response.statusText}`);
+        let errorMessage = '신고 접수에 실패했습니다.';
+        try {
+          const errorText = await response.text();
+          console.error('신고 접수 실패 - 응답 텍스트:', errorText);
+          
+          if (errorText) {
+            try {
+              const errorData = JSON.parse(errorText);
+              console.error('신고 접수 실패 - 파싱된 오류:', errorData);
+              errorMessage = errorData.message || errorData.error || errorText;
+            } catch (parseError) {
+              console.error('신고 접수 실패 - JSON 파싱 실패:', parseError);
+              errorMessage = errorText;
+            }
+          }
+        } catch (textError) {
+          console.error('신고 접수 실패 - 응답 텍스트 읽기 실패:', textError);
+        }
+        
+        console.error('신고 접수 실패:', response.status, response.statusText);
+        alert(`${errorMessage} (상태: ${response.status})`);
       }
       
     } catch (err) {
@@ -1078,37 +1107,33 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
       <div className={`bg-white/95 w-full max-w-7xl h-[90vh] flex overflow-hidden transform transition-all duration-500 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
         {/* 왼쪽: 이미지 섹션 */}
-        <div className="w-1/2 h-full overflow-hidden" style={{ position: 'relative' }}>
+        <div className="w-3/5 h-full overflow-hidden" style={{ position: 'relative' }}>
           {(column?.imageUrls || column?.image_url) ? (
             <div className="w-full h-full" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
               <ImageGallery imageUrl={column.imageUrls || column.image_url || ''} size="large" />
             </div>
           ) : (
-            <div className="w-full h-full bg-black flex items-center justify-center">
+            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
               <div className="text-white text-center">
-                <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-20 h-20 mx-auto mb-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p className="text-lg">이미지 없음</p>
+                <p className="text-xl font-medium">이미지 없음</p>
+                <p className="text-sm text-gray-400 mt-2">칼럼 이미지가 없습니다</p>
               </div>
             </div>
           )}
         </div>
 
         {/* 오른쪽: 상세 섹션 */}
-        <div className="w-1/2 flex flex-col rounded-r-lg overflow-hidden bg-white">
+        <div className="w-2/5 flex flex-col rounded-r-lg overflow-hidden bg-white">
           {/* 작성자/닫기/제목/통계 - 댓글 모달 상단과 유사 */}
           <div className="border-b border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-                  <div className="w-full h-full flex items-center justify-center bg-gray-300 text-gray-600">
-                    {column?.author ? column.author[0] : '?'}
-                  </div>
-                </div>
                 <div>
                   <div className="font-semibold">{column?.author ?? '작성자'}</div>
-                  <div className="text-sm text-gray-500">{column?.date ?? '날짜'}</div>
+                  <div className="text-sm text-gray-500">{column?.date ? column.date.replace('T', ' ').substring(0, 16) : '날짜'}</div>
                 </div>
               </div>
               <button 
@@ -1123,15 +1148,6 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
 
             <div className="flex items-center justify-between mt-4 mb-2">
               <h1 className="text-xl font-semibold">{loading ? '불러오는 중...' : (column?.title ?? '제목')}</h1>
-              <button
-                onClick={handleReportBoard}
-                className="text-gray-400 hover:text-red-500 transition-colors p-2"
-                title="게시글 신고하기"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </button>
             </div>
 
             <div className="flex items-center justify-between">
@@ -1198,8 +1214,8 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
             </div>
           </div>
 
-          {/* 본문 (고정 높이) */}
-          <div className="p-4 border-b border-gray-200">
+          {/* 본문 (고정 높이 + 스크롤) */}
+          <div className="p-4 border-b border-gray-200 max-h-96 overflow-y-auto">
             {loading ? (
               <div className="animate-pulse">
                 <div className="h-6 bg-gray-200 rounded mb-3"></div>
@@ -1250,11 +1266,6 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
                 {column.commentList.map((comment) => (
                   <div key={comment.comment_id} className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-start space-x-3">
-                      <div className="w-10 h-10 bg-gray-200 rounded-full flex-shrink-0">
-                        <div className="w-full h-full flex items-center justify-center text-sm text-gray-600">
-                          {comment.username.charAt(0).toUpperCase()}
-                        </div>
-                      </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-3">
@@ -1526,13 +1537,6 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
             </div>
           </div>
 
-          {/* 하단 액션 (선택) */}
-          <div className="border-t border-gray-200 p-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button className="text-gray-600 hover:text-blue-600 transition-colors">공유</button>
-            </div>
-            <button className="text-gray-600 hover:text-blue-600 transition-colors">북마크</button>
-          </div>
         </div>
       </div>
 

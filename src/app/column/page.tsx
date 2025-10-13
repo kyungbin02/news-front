@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import Sidebar from '@/components/Sidebar';
 import CommentModal from "@/components/CommentModal";
 import ColumnWriteModal from './ColumnWriteModal';
 import ColumnEditModal, { ColumnEditData } from './ColumnEditModal';
@@ -58,9 +57,9 @@ export default function Column() {
   const [currentSliderPage, setCurrentSliderPage] = useState(0);
   const sliderItemsPerPage = 3;
 
-  // 전체 칼럼 페이지네이션 상태
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  // 전체 칼럼 무한 스크롤 상태
+  const [displayedItemsCount, setDisplayedItemsCount] = useState(20);
+  const itemsPerLoad = 20;
 
   // 더보기 상태 관리
   const [expandedColumns, setExpandedColumns] = useState<number[]>([]);
@@ -80,22 +79,49 @@ export default function Column() {
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
   const [columns, setColumns] = useState(mockColumns);
   
-  // columns 상태가 선언된 후에 totalPages 계산
-  const totalPages = Math.ceil(columns.length / itemsPerPage);
+  // columns 상태가 선언된 후에 hasMore 계산
+  const hasMore = displayedItemsCount < columns.length;
 
   // 댓글 개수 계산 함수 (백엔드 필드 우선 사용)
   const calculateCommentCount = (item: any): number => {
-    // 1. 백엔드에서 제공하는 카운트 필드 사용
-    if (item.comment_count !== undefined) return Number(item.comment_count);
-    if (item.comments !== undefined) return Number(item.comments);
-    if (item.commentCount !== undefined) return Number(item.commentCount);
+    console.log('🔍 댓글 개수 계산 - 전체 item:', item);
+    console.log('🔍 댓글 개수 계산 - 댓글 관련 필드들:', {
+      itemId: item.board_id || item.id,
+      comment_count: item.comment_count,
+      comments: item.comments,
+      commentCount: item.commentCount,
+      comment_list: item.comment_list,
+      commentList: item.commentList,
+      allKeys: Object.keys(item)
+    });
+    
+    // 1. 백엔드에서 제공하는 카운트 필드 사용 (다양한 필드명 확인)
+    if (item.comment_count !== undefined && item.comment_count !== null) {
+      console.log('✅ comment_count 사용:', item.comment_count);
+      return Number(item.comment_count);
+    }
+    if (item.comments !== undefined && item.comments !== null) {
+      console.log('✅ comments 사용:', item.comments);
+      return Number(item.comments);
+    }
+    if (item.commentCount !== undefined && item.commentCount !== null) {
+      console.log('✅ commentCount 사용:', item.commentCount);
+      return Number(item.commentCount);
+    }
+    if (item.comment_list !== undefined && item.comment_list !== null) {
+      console.log('✅ comment_list 사용:', item.comment_list);
+      return Number(item.comment_list);
+    }
     
     // 2. commentList가 있으면 실제 길이 사용
     if (item.commentList && Array.isArray(item.commentList)) {
-      return item.commentList.length;
+      const count = item.commentList.length;
+      console.log('✅ commentList 길이 사용:', count);
+      return count;
     }
     
     // 3. 기본값 0
+    console.log('❌ 기본값 0 사용 - 댓글 관련 필드를 찾을 수 없음');
     return 0;
   };
 
@@ -105,8 +131,11 @@ export default function Column() {
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
       const response = await fetch(`${baseUrl}/api/board/comment/${boardId}`);
       
+      console.log(`🔍 ${boardId}번 게시물 댓글 API 호출:`, response.status);
+      
       if (response.ok) {
         const comments = await response.json();
+        console.log(`📝 ${boardId}번 게시물 댓글 응답:`, comments);
         
         // 댓글 개수 계산 (대댓글 포함)
         let totalCount = 0;
@@ -121,23 +150,31 @@ export default function Column() {
           }
         }
         
+        console.log(`📊 ${boardId}번 게시물 총 댓글 개수: ${totalCount}`);
         return totalCount;
       } else {
+        console.log(`❌ ${boardId}번 게시물 댓글 API 실패:`, response.status);
         return 0;
       }
     } catch (error) {
+      console.log(`💥 ${boardId}번 게시물 댓글 API 오류:`, error);
       return 0;
     }
   };
 
   // 서버 아이템을 화면 모델로 변환
   const mapServerItemToColumn = (item: any): Column => {
-    const { title, content } = parseTitleAndContent(item.board_content || item.content);
+    const title = item.board_title || '';
+    const content = item.board_content || item.content || '';
     
     // 디버깅: 백엔드 응답 구조 확인
-    console.log('백엔드 응답 데이터:', item);
-    console.log('이미지 URL (image_url):', item.image_url);
-    console.log('이미지 URL (imageUrl):', item.imageUrl);
+    console.log('🔍 게시물 데이터 분석:');
+    console.log('- 전체 item:', item);
+    console.log('- board_title:', item.board_title);
+    console.log('- board_content:', item.board_content);
+    console.log('- content:', item.content);
+    console.log('- 최종 title:', title);
+    console.log('- 최종 content:', content);
     console.log('이미지 URL (image_path):', item.image_path);
     console.log('이미지 URL (attachment_url):', item.attachment_url);
     
@@ -235,7 +272,7 @@ export default function Column() {
       author: item.username || item.author || '익명',
       date: item.uploaded_at || item.date || new Date().toISOString(),
       views: Number(item.view || item.views || 0),
-      comments: calculateCommentCount(item),
+      comments: 0, // 초기값 0으로 설정, 나중에 fetchCommentCount로 업데이트
       likes: Number(item.like_count || item.likes || 0),
       content: content || '내용 없음',
       image_url: fullImageUrl || undefined,
@@ -286,13 +323,11 @@ export default function Column() {
       return;
     }
     
-    // content에서 제목과 내용 분리
-    const { title, content } = parseTitleAndContent(column.content);
-    
+    // Column 객체의 필드 사용 (board_content, board_title은 API 응답에만 있음)
     setEditTarget({ 
       id: column.id, 
       content: column.content,
-      title: title,
+      title: column.title,
       imageUrls: column.imageUrls,
       image_url: column.image_url
     });
@@ -713,15 +748,13 @@ export default function Column() {
     return topTen.slice(startIndex, endIndex);
   };
 
-  // 전체 칼럼 페이지네이션 함수
+  // 전체 칼럼 무한 스크롤 함수
   const getVisibleColumns = () => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return memoizedColumns.slice(startIndex, endIndex);
+    return memoizedColumns.slice(0, displayedItemsCount);
   };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+  const handleLoadMore = () => {
+    setDisplayedItemsCount(prev => prev + itemsPerLoad);
   };
 
   const handleColumnClick = (columnId: number) => {
@@ -736,6 +769,9 @@ export default function Column() {
   };
 
   const handleAddColumn = async (newColumn: Column) => {
+    console.log('📝 새 칼럼 추가 시작:', newColumn);
+    console.log('새 칼럼 이미지 정보:', newColumn.imageUrls);
+    
     // 글 작성 후 서버에서 최신 목록을 다시 가져오기
     try {
       const token = getToken();
@@ -755,6 +791,8 @@ export default function Column() {
         console.log('👤 글 작성 후: 기본 API 호출');
       }
       
+      console.log('API 호출 URL:', apiUrl);
+      
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers
@@ -763,16 +801,33 @@ export default function Column() {
       if (response.ok) {
         const data = await response.json();
         console.log('글 작성 후 최신 목록:', data);
+        console.log('서버 응답 데이터 개수:', data.length);
+        
         const serverColumns: Column[] = data.map(mapServerItemToColumn);
+        console.log('변환된 칼럼 개수:', serverColumns.length);
+        
+        // 새로 추가된 칼럼의 이미지 정보 확인
+        const latestColumn = serverColumns[0];
+        if (latestColumn) {
+          console.log('최신 칼럼 이미지 정보:', {
+            id: latestColumn.id,
+            imageUrls: latestColumn.imageUrls,
+            image_url: latestColumn.image_url
+          });
+        }
+        
         setColumns(serverColumns);
+        console.log('칼럼 목록 업데이트 완료');
       } else {
         console.error('글 작성 후 목록 새로고침 실패:', response.status);
         // 실패 시 기존 방식으로 추가
+        console.log('기존 방식으로 칼럼 추가:', newColumn);
         setColumns(prev => [newColumn, ...prev]);
       }
     } catch (error) {
       console.error('글 작성 후 목록 새로고침 오류:', error);
       // 오류 시 기존 방식으로 추가
+      console.log('오류로 인한 기존 방식 칼럼 추가:', newColumn);
       setColumns(prev => [newColumn, ...prev]);
     }
   };
@@ -883,11 +938,20 @@ export default function Column() {
           // 각 게시글의 댓글 개수를 가져와서 업데이트
           const columnsWithCommentCounts = await Promise.all(
             serverColumns.map(async (column) => {
-              const commentCount = await fetchCommentCount(column.id);
-              return {
-                ...column,
-                comments: commentCount
-              };
+              try {
+                const commentCount = await fetchCommentCount(column.id);
+                console.log(`✅ ${column.id}번 게시물 댓글 개수: ${commentCount}`);
+                return {
+                  ...column,
+                  comments: commentCount
+                };
+              } catch (error) {
+                console.log(`❌ ${column.id}번 게시물 댓글 개수 가져오기 실패, 기본값 0 사용`);
+                return {
+                  ...column,
+                  comments: 0
+                };
+              }
             })
           );
           
@@ -1122,298 +1186,317 @@ export default function Column() {
         <div className="flex gap-8">
           {/* Main Content */}
           <div className="flex-1">
-            {/* 인기 칼럼 슬라이더 */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold">인기 칼럼</h2>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={prevSliderPage}
-                    className="p-2 rounded-full hover:bg-gray-100"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={nextSliderPage}
-                    className="p-2 rounded-full hover:bg-gray-100"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
+             {/* 인기 칼럼 섹션 */}
+             <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl shadow-lg p-8 mb-8">
+               <div className="flex items-center justify-between mb-8">
+                 <div className="flex items-center space-x-4">
+                   <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                     <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                     </svg>
+                   </div>
+                   <div>
+                     <h2 className="text-3xl font-bold text-gray-900">🔥 인기 칼럼</h2>
+                     <p className="text-gray-600">지금 가장 핫한 칼럼들을 확인해보세요</p>
+                   </div>
+                 </div>
+                 <div className="flex items-center space-x-2">
+                   <button
+                     onClick={prevSliderPage}
+                     className="w-10 h-10 bg-white rounded-full shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center text-gray-600 hover:text-blue-600"
+                   >
+                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                     </svg>
+                   </button>
+                   <button
+                     onClick={nextSliderPage}
+                     className="w-10 h-10 bg-white rounded-full shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center text-gray-600 hover:text-blue-600"
+                   >
+                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                     </svg>
+                   </button>
+                 </div>
+               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {getVisibleTopColumns().map((column, index) => (
-                  <div 
-                    key={column.id} 
-                    className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => handleColumnClick(column.id)}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-blue-600 font-bold">#{currentSliderPage * sliderItemsPerPage + index + 1}</span>
-                        <span className="text-sm text-gray-500">{column.views?.toLocaleString() || '0'} views</span>
-                      </div>
-                    </div>
-                    <h3 className="font-bold mb-2 line-clamp-2">{column.title}</h3>
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{column.content}</p>
-                    <div className="flex items-center justify-between text-sm text-gray-500">
-                      <span>{column.author}</span>
-                      <div className="flex items-center space-x-3">
-                        <span>{column.comments} 댓글</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 {getVisibleTopColumns().map((column, index) => (
+                   <div 
+                     key={column.id} 
+                     className="bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer overflow-hidden group transform hover:scale-105"
+                     onClick={() => handleColumnClick(column.id)}
+                   >
+                     {/* 순위 배지 */}
+                     <div className="relative">
+                       <div className="absolute top-4 left-4 z-10">
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-lg ${
+                           index === 0 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
+                           index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-400' :
+                           'bg-gradient-to-r from-orange-400 to-red-500'
+                         }`}>
+                           {currentSliderPage * sliderItemsPerPage + index + 1}
+                         </div>
+                       </div>
+                       
+                       {/* 이미지 영역 */}
+                       <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden">
+                         {(column.imageUrls || column.image_url) ? (
+                           <div className="w-full h-full">
+                             <ImageGallery imageUrl={column.imageUrls || column.image_url || ''} size="small" />
+                           </div>
+                         ) : (
+                           <div className="w-full h-full flex items-center justify-center">
+                             <div className="text-center">
+                               <div className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center ${
+                                 index === 0 ? 'bg-gradient-to-r from-yellow-100 to-orange-100' :
+                                 index === 1 ? 'bg-gradient-to-r from-gray-100 to-gray-200' :
+                                 'bg-gradient-to-r from-orange-100 to-red-100'
+                               }`}>
+                                 <span className={`text-2xl ${
+                                   index === 0 ? 'text-yellow-600' :
+                                   index === 1 ? 'text-gray-600' :
+                                   'text-orange-600'
+                                 }`}>
+                                   {index === 0 ? '🏆' : index === 1 ? '🥈' : '🥉'}
+                                 </span>
+                               </div>
+                               <p className="text-sm text-gray-500">이미지 없음</p>
+                             </div>
+                           </div>
+                         )}
+                         
+                         {/* 그라데이션 오버레이 */}
+                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+                       </div>
+                     </div>
 
-              <div className="flex justify-center mt-6">
-                <div className="flex space-x-2">
-                  {Array.from({ length: getTotalSliderPages() }, (_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setCurrentSliderPage(i)}
-                      className={`w-2 h-2 rounded-full ${
-                        currentSliderPage === i ? 'bg-blue-600' : 'bg-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
+                     {/* 카드 내용 */}
+                     <div className="p-6">
+                       <div className="flex items-center justify-between mb-3">
+                         <div className="flex items-center space-x-2">
+                           <span className="text-sm font-semibold text-blue-600">
+                             👁️ {column.views?.toLocaleString() || '0'} views
+                           </span>
+                         </div>
+                         <div className="flex items-center space-x-1 text-sm text-gray-500">
+                           <span>💬 {column.comments || 0}</span>
+                         </div>
+                       </div>
+                       
+                       <h3 className="font-bold text-lg mb-3 line-clamp-2 text-gray-900 group-hover:text-blue-600 transition-colors">
+                         {column.title}
+                       </h3>
+                       
+                       <p className="text-sm text-gray-600 mb-4 line-clamp-3 leading-relaxed">
+                         {column.content && column.content.length > 150 
+                           ? column.content.substring(0, 150) + '...' 
+                           : column.content}
+                       </p>
+                       
+                       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                         <div className="flex items-center space-x-2">
+                           <span className="text-sm font-medium text-gray-700">{column.author}</span>
+                         </div>
+                         <div className="text-xs text-gray-500">
+                           {column.date.replace('T', ' ').substring(0, 16)}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+
+               {/* 페이지 인디케이터 */}
+               <div className="flex justify-center mt-8">
+                 <div className="flex space-x-3">
+                   {Array.from({ length: getTotalSliderPages() }, (_, i) => (
+                     <button
+                       key={i}
+                       onClick={() => setCurrentSliderPage(i)}
+                       className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                         currentSliderPage === i 
+                           ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-lg' 
+                           : 'bg-gray-300 hover:bg-gray-400'
+                       }`}
+                     />
+                   ))}
+                 </div>
+               </div>
+             </div>
 
             {/* 전체 칼럼 목록 */}
             <div className="mt-8">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-12">
                 <h2 className="text-2xl font-bold">전체 칼럼</h2>
                 {isLoggedIn && (
                   <button 
                     onClick={() => setIsWriteModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                   >
-                    글쓰기
+                    ✍️ 글쓰기
                   </button>
                 )}
               </div>
-              <div className="space-y-4" key={`columns-${forceRefresh}-${columns.length}-${Date.now()}-${Math.random()}`}>
-                {getVisibleColumns().map((column) => (
-                  <div 
-                    key={column.id} 
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleColumnClick(column.id)}
-                  >
-                    {/* 헤더 */}
-                    <div className="p-4 flex items-center justify-between relative" data-action-root={column.id}>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden">
-                          <img 
-                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${column.author}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`}
-                            alt={column.author}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // 이미지 로드 실패 시 기본 아바타로 대체
-                              const target = e.target as HTMLImageElement;
-                              target.src = `data:image/svg+xml;base64,${btoa(`
-                                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <rect width="40" height="40" rx="20" fill="#E5E7EB"/>
-                                  <text x="20" y="25" text-anchor="middle" font-family="Arial" font-size="16" fill="#6B7280">${column.author.charAt(0).toUpperCase()}</text>
-                                </svg>
-                              `)}`;
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <div className="font-semibold">{column.author}</div>
-                          <div className="text-sm text-gray-500">{column.date}</div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => toggleActionMenu(e, column.id)}
-                        className="text-gray-400 hover:text-gray-600"
-                        aria-haspopup="menu"
-                        aria-expanded={openActionMenuId === column.id}
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                        </svg>
-                      </button>
+               {/* 갤러리 그리드 레이아웃 */}
+               {getVisibleColumns().length > 0 ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" key={`columns-${forceRefresh}-${columns.length}-${Date.now()}-${Math.random()}`}>
+                   {getVisibleColumns().map((column) => (
+                   <div 
+                     key={column.id} 
+                     className="bg-white rounded-xl shadow-lg border border-gray-100 cursor-pointer hover:shadow-2xl hover:scale-105 transition-all duration-300 ease-out overflow-hidden group"
+                     onClick={() => handleColumnClick(column.id)}
+                   >
+                     {/* 메뉴 버튼 */}
+                     <div className="relative p-6" data-action-root={column.id}>
+                       <button
+                         onClick={(e) => toggleActionMenu(e, column.id)}
+                         className="absolute top-3 right-3 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center text-gray-600 hover:text-gray-800 transition-all duration-200 shadow-sm opacity-0 group-hover:opacity-100"
+                         aria-haspopup="menu"
+                         aria-expanded={openActionMenuId === column.id}
+                       >
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                         </svg>
+                       </button>
 
-                      {openActionMenuId === column.id && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          role="menu"
-                          className="absolute right-4 top-12 z-20 w-36 bg-white border border-gray-200 rounded-md shadow-lg py-1"
-                        >
-                          {currentUserId && column.user_id === currentUserId && (
-                            <button
-                              role="menuitem"
-                              onClick={(e) => handleEditColumn(e, column)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                            >
-                              수정
-                            </button>
-                          )}
-                          {currentUserId && column.user_id === currentUserId && (
-                            <button
-                              role="menuitem"
-                              onClick={(e) => handleDeleteColumn(e, column.id)}
-                              className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                            >
-                              삭제
-                            </button>
-                          )}
-                          <div className="border-t border-gray-100 my-1"></div>
-                          <button
-                            role="menuitem"
-                            onClick={(e) => handleReportColumn(e, column.id)}
-                            className="w-full text-left px-3 py-2 text-sm text-orange-600 hover:bg-orange-50"
-                          >
-                            신고하기
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                       {openActionMenuId === column.id && (
+                         <div
+                           onClick={(e) => e.stopPropagation()}
+                           role="menu"
+                           className="absolute right-3 top-12 z-20 w-32 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
+                         >
+                           {currentUserId && column.user_id === currentUserId && (
+                             <button
+                               role="menuitem"
+                               onClick={(e) => handleEditColumn(e, column)}
+                               className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
+                             >
+                               수정
+                             </button>
+                           )}
+                           {currentUserId && column.user_id === currentUserId && (
+                             <button
+                               role="menuitem"
+                               onClick={(e) => handleDeleteColumn(e, column.id)}
+                               className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                             >
+                               삭제
+                             </button>
+                           )}
+                           <div className="border-t border-gray-100 my-1"></div>
+                           <button
+                             role="menuitem"
+                             onClick={(e) => handleReportColumn(e, column.id)}
+                             className="w-full text-left px-3 py-2 text-sm text-orange-600 hover:bg-orange-50"
+                           >
+                             신고하기
+                           </button>
+                         </div>
+                       )}
 
-                    {/* 제목, 내용, 이미지를 가로로 배치 */}
-                    <div className="px-4">
-                      <div className="flex gap-6">
-                        {/* 텍스트 영역 - 왼쪽으로 이동 */}
-                        <div className="flex-1">
-                          <h2 className="text-xl font-bold mb-3">{column.title}</h2>
-                          
-                          {/* 내용 - 항상 표시 */}
-                          <div className="mb-4">
-                            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
-                              {column.content}
-                            </p>
-                          </div>
-                        </div>
+                       {/* 작성자 정보 */}
+                       <div className="flex items-center mb-4">
+                         <div className="flex-1">
+                           <span className="text-sm font-semibold text-gray-800">{column.author}</span>
+                           <div className="text-xs text-gray-500">{column.date.replace('T', ' ').substring(0, 16)}</div>
+                         </div>
+                         <div className="text-xs text-gray-400">
+                           👁️ {column.views?.toLocaleString() || '0'}
+                         </div>
+                       </div>
 
-                        {/* 이미지 영역 - 오른쪽으로 이동 */}
-                        {(column.imageUrls || column.image_url) && (
-                          <div className="flex-shrink-0 pr-4">
-                            <ImageGallery imageUrl={column.imageUrls || column.image_url || ''} size="small" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                       {/* 제목 */}
+                       <h2 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+                         {column.title}
+                       </h2>
+                       
+                       {/* 내용 */}
+                       <p className="text-sm text-gray-600 mb-4 line-clamp-4 leading-relaxed">
+                         {column.content && column.content.length > 200 
+                           ? column.content.substring(0, 200) + '...' 
+                           : column.content}
+                       </p>
 
-                    {/* 상호작용 버튼 */}
-                    <div className="px-4 pb-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-4">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleLikeToggle(column.id);
-                            }}
-                            className="text-gray-600 hover:text-red-500 transition-colors"
-                          >
-                            <svg 
-                              className={`w-5 h-5 transition-all duration-200 ${
-                                column.isLiked ? 'fill-current text-red-500' : 'fill-none'
-                              }`}
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path 
-                                strokeLinecap="round" 
-                                strokeLinejoin="round" 
-                                strokeWidth="2" 
-                                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
-                              />
-                            </svg>
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleColumnClick(column.id);
-                            }}
-                            className="text-gray-600 hover:text-blue-500 transition-colors"
-                          >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                          </button>
-                        </div>
-                        <button 
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-gray-600 hover:text-blue-500 transition-colors"
-                        >
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                          </svg>
-                        </button>
-                      </div>
+                       {/* 하단 통계 */}
+                       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                         <div className="flex items-center space-x-4">
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleLikeToggle(column.id);
+                             }}
+                             className="flex items-center space-x-1 text-gray-500 hover:text-red-500 transition-colors"
+                           >
+                             <svg 
+                               className={`w-4 h-4 ${column.isLiked ? 'fill-current text-red-500' : 'fill-none'}`}
+                               stroke="currentColor" 
+                               viewBox="0 0 24 24"
+                             >
+                               <path 
+                                 strokeLinecap="round" 
+                                 strokeLinejoin="round" 
+                                 strokeWidth="2" 
+                                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" 
+                               />
+                             </svg>
+                           </button>
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleColumnClick(column.id);
+                             }}
+                             className="flex items-center space-x-1 text-gray-500 hover:text-blue-500 transition-colors"
+                           >
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                             </svg>
+                             <span className="text-xs">{column.comments || 0}</span>
+                           </button>
+                         </div>
+                         <div className="text-xs text-gray-400">
+                           {column.date.replace('T', ' ').substring(0, 16)}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+               ) : (
+                 /* 빈 상태 안내 메시지 */
+                 <div className="text-center py-16">
+                   <div className="max-w-md mx-auto">
+                     <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
+                       <svg className="w-12 h-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                       </svg>
+                     </div>
+                     <h3 className="text-xl font-semibold text-gray-900 mb-2">아직 작성된 칼럼이 없습니다</h3>
+                     <p className="text-gray-600 mb-6">첫 번째 칼럼을 작성해보세요!</p>
+                     {isLoggedIn && (
+                       <button 
+                         onClick={() => setIsWriteModalOpen(true)}
+                         className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                       >
+                         ✍️ 첫 칼럼 작성하기
+                       </button>
+                     )}
+                   </div>
+                 </div>
+               )}
 
-                      {/* 통계 */}
-                      <div className="flex items-center space-x-4 text-sm text-gray-500">
-                        <span 
-                          className="cursor-pointer hover:text-blue-500 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleColumnClick(column.id);
-                          }}
-                        >
-                          {column.comments} 댓글
-
-                        </span>
-                        <span>{column.views?.toLocaleString() || '0'} 조회</span>
-                      </div>
-
-                      {/* 댓글 섹션 - 제거됨 */}
-                      {/* 댓글 입력 폼과 목록을 상세페이지로 이동 */}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* 페이지네이션 */}
-              <div className="flex justify-center mt-8">
-                <div className="flex space-x-2">
+              {/* More 버튼 */}
+              {hasMore && (
+                <div className="flex justify-center mt-8">
                   <button 
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className={`px-4 py-2 border rounded-md ${
-                      currentPage === 1 
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                        : 'hover:bg-gray-50'
-                    }`}
+                    onClick={handleLoadMore}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                   >
-                    이전
-                  </button>
-                  
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`px-4 py-2 border rounded-md ${
-                        currentPage === page
-                          ? 'bg-blue-600 text-white'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-
-                  <button 
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className={`px-4 py-2 border rounded-md ${
-                      currentPage === totalPages 
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    다음
+                    📖 더 보기
                   </button>
                 </div>
-              </div>
+              )}
+              
             </div>
 
             {/* 글쓰기 모달 */}
@@ -1488,8 +1571,6 @@ export default function Column() {
 
           </div>
 
-          {/* Sidebar */}
-          <Sidebar />
         </div>
       </div>
 
@@ -1581,6 +1662,9 @@ export default function Column() {
           </div>
         </div>
       )}
+
+      {/* 푸터 위 공간 */}
+      <div className="h-20"></div>
     </div>
   );
 } 

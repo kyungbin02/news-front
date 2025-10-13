@@ -16,3 +16,9 @@ export default function DynamicHeader() {
   return shouldUseSpecialHeader ? <SpecialHeader /> : <StandardHeader />;
 }
 
+
+
+
+
+
+

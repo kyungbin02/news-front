@@ -155,15 +155,15 @@ export default function CustomerService() {
 
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
       
-      console.log('🔍 관리자용 문의사항 목록 조회 API 호출:', {
-        url: `${baseUrl}/api/admin/inquiry/list`,
+      console.log('🔍 사용자별 문의사항 목록 조회 API 호출:', {
+        url: `${baseUrl}/api/inquiry/list`,
         token: token ? '있음' : '없음',
         tokenLength: token ? token.length : 0,
         tokenPreview: token ? `${token.substring(0, 20)}...` : '없음',
         isValid: isTokenValid(token)
       });
       
-      const response = await fetch(`${baseUrl}/api/admin/inquiry/list`, {
+      const response = await fetch(`${baseUrl}/api/inquiry/list`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -188,10 +188,21 @@ export default function CustomerService() {
           });
         });
         
-        // 최신순으로 정렬
-        const sortedInquiries = data.sort((a: Inquiry, b: Inquiry) => {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
+        // 최신순으로 정렬하고 데이터 매핑
+        const sortedInquiries = data
+          .sort((a: any, b: any) => {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          })
+          .map((inquiry: any) => ({
+            inquiry_id: inquiry.inquiry_id,
+            inquiry_title: inquiry.inquiry_title,
+            inquiry_content: inquiry.inquiry_content,
+            inquiry_status: inquiry.inquiry_status,
+            created_at: inquiry.created_at,
+            answer_content: inquiry.answer_content || '',
+            answer_created_at: inquiry.answer_created_at || null,
+            admin_username: inquiry.admin_username || null
+          }));
         
         setInquiries(sortedInquiries);
       } else {
@@ -297,12 +308,12 @@ export default function CustomerService() {
       // 관리자용 API를 사용하여 답변 정보를 가져오기
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
       
-      console.log('🔍 관리자용 문의사항 목록에서 답변 정보 가져오기:', {
-        url: `${baseUrl}/api/admin/inquiry/list`,
+      console.log('🔍 사용자별 문의사항 목록에서 답변 정보 가져오기:', {
+        url: `${baseUrl}/api/inquiry/list`,
         inquiryId: id
       });
       
-      const listResponse = await fetch(`${baseUrl}/api/admin/inquiry/list`, {
+      const listResponse = await fetch(`${baseUrl}/api/inquiry/list`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -574,7 +585,7 @@ export default function CustomerService() {
                                 {inquiry.answer_content}
                               </div>
                               <div className="text-sm text-gray-500 mt-2 flex items-center justify-between">
-                                <span>답변일: {inquiry.answer_created_at ? new Date(inquiry.answer_created_at).toLocaleDateString() : ''}</span>
+                                <span>답변일: {inquiry.answer_created_at ? new Date(inquiry.answer_created_at).toLocaleDateString() : '정보 없음'}</span>
                                 {inquiry.admin_username && (
                                   <span>답변자: {inquiry.admin_username}</span>
                                 )}
@@ -582,7 +593,7 @@ export default function CustomerService() {
                             </>
                           ) : (
                             <div className="text-gray-500 italic">
-                              답변 내용을 불러오는 중입니다...
+                              답변은 완료되었지만 내용을 불러올 수 없습니다. 관리자에게 문의해주세요.
                             </div>
                           )}
                         </div>

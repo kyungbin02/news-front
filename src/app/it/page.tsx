@@ -5,6 +5,7 @@ import { RSSArticle, fetchRSSNews } from '@/utils/rssApi';
 import { saveArticlesToStorage } from '@/utils/articleStorage';
 import { searchNews, trackSearch } from '@/utils/searchApi';
 import { trackNewsClick } from '@/utils/newsClickApi';
+import SourceFilter from "@/components/SourceFilter";
 import Sidebar from "@/components/Sidebar";
 import SearchBar from "@/components/SearchBar";
 import Link from "next/link";
@@ -17,6 +18,7 @@ export default function ITPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedNewsIndex, setSelectedNewsIndex] = useState(0);
+  const [selectedSources, setSelectedSources] = useState<string[]>([]); // 선택된 언론사들
   
   const articlesPerPage = 6;
 
@@ -28,6 +30,13 @@ export default function ITPage() {
 
   const handleNewsClick = async (article: RSSArticle) => {
     try {
+      // RSS 뉴스(해시 ID)는 클릭 추적 건너뛰기
+      const isNumericId = /^\d+$/.test(article.id);
+      if (!isNumericId) {
+        console.log(`RSS 뉴스 클릭 추적 건너뛰기: ${article.title} (ID: ${article.id})`);
+        return;
+      }
+      
       await trackNewsClick(article.id, article.title);
       console.log(`IT 뉴스 클릭 추적됨: ${article.title}`);
     } catch (error) {
@@ -119,10 +128,25 @@ export default function ITPage() {
                   description: (news.content || '').substring(0, 200) + '...',
                   link: `/news/${news.newsId || `it-${index}`}`,
                   category: 'it',
-                  source: 'IT News Backend',
+                  source: news.source || '알 수 없는 출처', // 실제 언론사명 사용
                   imageUrl: news.imageUrl || '/image/news.webp',
                   pubDate: news.createdAt || new Date().toISOString()
-                }));
+                }))
+                .filter((article: any) => {
+                  // IT 관련 키워드로 필터링 (더 포괄적으로)
+                  const itKeywords = [
+                    'IT', '기술', '테크', '디지털', '인공지능', 'AI', '소프트웨어', '하드웨어', 
+                    '컴퓨터', '인터넷', '모바일', '앱', '게임', '스마트폰', '반도체', '전자', 
+                    '통신', '5G', '클라우드', '빅데이터', '블록체인', '메타버스', 'VR', 'AR',
+                    '스타트업', '창업', '개발', '프로그래밍', '코딩', '알고리즘', '데이터',
+                    '네트워크', '보안', '해킹', '암호화', '머신러닝', '딥러닝', '로봇',
+                    '자동화', '스마트', '디지털화', '온라인', '웹', '사이트', '플랫폼',
+                    'API', '서버', '데이터베이스', '프레임워크', '라이브러리', '언어',
+                    '파이썬', '자바', '자바스크립트', 'C++', 'C#', '코틀린', '스위프트'
+                  ];
+                  const text = (article.title + ' ' + article.description).toLowerCase();
+                  return itKeywords.some(keyword => text.includes(keyword.toLowerCase()));
+                });
               
               console.log('백엔드에서 IT 뉴스 로드:', backendNews.length);
               
@@ -158,14 +182,28 @@ export default function ITPage() {
   }, []);
 
   const getCurrentPageArticles = () => {
+    let filteredNews = news;
+    
+    // 언론사 필터링
+    if (selectedSources.length > 0) {
+      filteredNews = news.filter(article => 
+        selectedSources.includes(article.source)
+      );
+    }
+    
     const startIndex = (currentPage - 1) * articlesPerPage;
     const endIndex = startIndex + articlesPerPage;
-    return news.slice(startIndex, endIndex);
+    return filteredNews.slice(startIndex, endIndex);
+  };
+
+  // 언론사 필터 변경 핸들러
+  const handleSourceChange = (sources: string[]) => {
+    setSelectedSources(sources);
+    setCurrentPage(1); // 필터 변경 시 첫 페이지로
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const Pagination = () => {
@@ -381,6 +419,203 @@ export default function ITPage() {
           </div>
         </div>
 
+        {/* IT 기술 트렌드 및 도구 섹션 */}
+        <div className="relative z-10 bg-gradient-to-br from-purple-50 to-blue-100 py-16">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">IT 기술 트렌드</h2>
+              <p className="text-gray-600">최신 기술 동향과 개발자 도구를 확인하세요</p>
+            </div>
+            
+            {/* 기술 트렌드 차트 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+              {/* 기술 트렌드 */}
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                  <span className="text-2xl mr-3">📊</span>
+                  인기 기술 트렌드
+                </h3>
+                <div className="space-y-4">
+                  {[
+                    { tech: "AI/머신러닝", popularity: 95, trend: "상승", color: "bg-purple-500" },
+                    { tech: "클라우드 컴퓨팅", popularity: 88, trend: "상승", color: "bg-blue-500" },
+                    { tech: "블록체인", popularity: 72, trend: "안정", color: "bg-green-500" },
+                    { tech: "IoT", popularity: 65, trend: "상승", color: "bg-orange-500" },
+                    { tech: "메타버스", popularity: 58, trend: "하락", color: "bg-pink-500" },
+                    { tech: "5G", popularity: 82, trend: "상승", color: "bg-indigo-500" }
+                  ].map((item, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-900">{item.tech}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-sm px-2 py-1 rounded-full ${
+                            item.trend === '상승' ? 'bg-green-100 text-green-600' :
+                            item.trend === '하락' ? 'bg-red-100 text-red-600' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {item.trend}
+                          </span>
+                          <span className="text-sm font-bold text-gray-600">{item.popularity}%</span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className={`h-3 rounded-full ${item.color}`}
+                          style={{ width: `${item.popularity}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 개발자 도구 모음 */}
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                  <span className="text-2xl mr-3">🛠️</span>
+                  개발자 도구
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { name: "VS Code", category: "에디터", icon: "💻", rating: "4.8" },
+                    { name: "GitHub", category: "버전관리", icon: "🐙", rating: "4.9" },
+                    { name: "Docker", category: "컨테이너", icon: "🐳", rating: "4.7" },
+                    { name: "React", category: "프레임워크", icon: "⚛️", rating: "4.6" },
+                    { name: "Node.js", category: "런타임", icon: "🟢", rating: "4.5" },
+                    { name: "MongoDB", category: "데이터베이스", icon: "🍃", rating: "4.4" },
+                    { name: "AWS", category: "클라우드", icon: "☁️", rating: "4.7" },
+                    { name: "Figma", category: "디자인", icon: "🎨", rating: "4.8" }
+                  ].map((tool, index) => (
+                    <div key={index} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer group">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">{tool.icon}</div>
+                        <div className="font-semibold text-gray-900 text-sm mb-1">{tool.name}</div>
+                        <div className="text-xs text-gray-500 mb-2">{tool.category}</div>
+                        <div className="flex items-center justify-center space-x-1">
+                          <svg className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                          </svg>
+                          <span className="text-xs font-medium text-gray-600">{tool.rating}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 기술 뉴스레터 구독 및 학습 리소스 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* 기술 뉴스레터 구독 */}
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                  <span className="text-2xl mr-3">📧</span>
+                  기술 뉴스레터 구독
+                </h3>
+                <div className="space-y-4">
+                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <h4 className="font-semibold text-purple-800 mb-2">주간 IT 트렌드</h4>
+                    <p className="text-sm text-purple-700 mb-3">
+                      매주 최신 IT 기술 동향과 업계 소식을 이메일로 받아보세요
+                    </p>
+                    <div className="flex space-x-2">
+                      <input 
+                        type="email" 
+                        placeholder="이메일 주소를 입력하세요"
+                        className="flex-1 px-3 py-2 border border-purple-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                      <button className="px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors">
+                        구독
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-semibold text-blue-800 mb-2">개발자 팁 & 트릭</h4>
+                    <p className="text-sm text-blue-700 mb-3">
+                      실무에서 바로 쓸 수 있는 코딩 팁과 최적화 기법을 배우세요
+                    </p>
+                    <div className="flex space-x-2">
+                      <input 
+                        type="email" 
+                        placeholder="이메일 주소를 입력하세요"
+                        className="flex-1 px-3 py-2 border border-blue-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
+                        구독
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 학습 리소스 */}
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                  <span className="text-2xl mr-3">📚</span>
+                  추천 학습 리소스
+                </h3>
+                <div className="space-y-4">
+                  {[
+                    { 
+                      title: "React 공식 문서", 
+                      type: "문서", 
+                      difficulty: "초급", 
+                      time: "2시간",
+                      icon: "📖"
+                    },
+                    { 
+                      title: "Node.js 마스터 클래스", 
+                      type: "강의", 
+                      difficulty: "중급", 
+                      time: "8시간",
+                      icon: "🎓"
+                    },
+                    { 
+                      title: "AWS 클라우드 아키텍처", 
+                      type: "실습", 
+                      difficulty: "고급", 
+                      time: "12시간",
+                      icon: "🏗️"
+                    },
+                    { 
+                      title: "AI/ML 기초 코스", 
+                      type: "강의", 
+                      difficulty: "중급", 
+                      time: "6시간",
+                      icon: "🤖"
+                    }
+                  ].map((resource, index) => (
+                    <div key={index} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer group">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">{resource.icon}</span>
+                          <div>
+                            <div className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">
+                              {resource.title}
+                            </div>
+                            <div className="text-sm text-gray-500">{resource.type}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-gray-600">{resource.time}</div>
+                          <div className={`text-xs px-2 py-1 rounded-full ${
+                            resource.difficulty === '초급' ? 'bg-green-100 text-green-600' :
+                            resource.difficulty === '중급' ? 'bg-yellow-100 text-yellow-600' :
+                            'bg-red-100 text-red-600'
+                          }`}>
+                            {resource.difficulty}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 뉴스 그리드 섹션 */}
         <div className="relative z-10 bg-white">
           <div className="container mx-auto px-4 py-16">
@@ -404,6 +639,14 @@ export default function ITPage() {
                         </span>
                       )}
                     </div>
+                  </div>
+                  
+                  {/* 언론사 필터 */}
+                  <div className="mb-6">
+                    <SourceFilter 
+                      onSourceChange={handleSourceChange}
+                      className="w-full"
+                    />
                   </div>
                   <div className="flex items-center justify-between">
                     <div>

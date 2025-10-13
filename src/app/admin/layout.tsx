@@ -11,7 +11,6 @@ import {
   Eye,
   Heart,
   MessageCircle,
-  TrendingUp,
   AlertCircle,
   CheckCircle,
   Clock,
@@ -108,8 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               { id: 'users', label: '사용자 관리', icon: Users, href: '/admin/users' },
               { id: 'posts', label: '게시물 관리', icon: FileText, href: '/admin/posts' },
               { id: 'reports', label: '신고내역', icon: AlertCircle, href: '/admin/reports' },
-              { id: 'support', label: '고객센터', icon: Headphones, href: '/admin/support' },
-              { id: 'news', label: '뉴스 통계', icon: TrendingUp, href: '/admin/news' }
+              { id: 'support', label: '고객센터', icon: Headphones, href: '/admin/support' }
             ].map((tab) => {
               const isActive = pathname === tab.href;
               return (

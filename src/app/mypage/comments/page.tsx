@@ -31,6 +31,7 @@ export default function MyCommentsPage() {
   };
   const [comments, setComments] = useState<MyComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedNews, setExpandedNews] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadComments = async () => {
@@ -48,6 +49,30 @@ export default function MyCommentsPage() {
 
     loadComments();
   }, []);
+
+  // 댓글을 뉴스별로 그룹화
+  const groupedComments = comments.reduce((acc, comment) => {
+    const key = `${comment.newsId}-${comment.newsTitle}`;
+    if (!acc[key]) {
+      acc[key] = {
+        newsId: comment.newsId,
+        newsTitle: comment.newsTitle,
+        comments: []
+      };
+    }
+    acc[key].comments.push(comment);
+    return acc;
+  }, {} as Record<string, { newsId: string; newsTitle: string; comments: MyComment[] }>);
+
+  const toggleExpanded = (newsKey: string) => {
+    const newExpanded = new Set(expandedNews);
+    if (newExpanded.has(newsKey)) {
+      newExpanded.delete(newsKey);
+    } else {
+      newExpanded.add(newsKey);
+    }
+    setExpandedNews(newExpanded);
+  };
 
   if (loading) {
     return (
@@ -126,94 +151,138 @@ export default function MyCommentsPage() {
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
-              {comments.map((comment, index) => (
-                <div key={comment.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start gap-6">
-                    {/* 뉴스 이미지 */}
-                    <div className="w-32 h-32 flex-shrink-0">
-                      <Link href={`/news/${comment.newsId}`} className="block">
-                        {(() => {
-                          const imageUrl = getImageFromStoredNews(comment.newsId, comment.newsTitle);
-                          return imageUrl !== '/image/news.webp' ? (
-                            <img 
-                              src={imageUrl} 
-                              alt={comment.newsTitle}
-                              className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity shadow-md"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.style.display = 'none';
-                                const parent = target.parentElement;
-                                if (parent) {
-                                  parent.innerHTML = `
-                                    <div class="w-full h-full bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center rounded-lg border-2 border-green-200">
-                                      <div class="text-green-400 text-3xl">💬</div>
-                                    </div>
-                                  `;
-                                }
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center rounded-lg border-2 border-green-200">
-                              <div className="text-green-400 text-3xl">💬</div>
-                            </div>
-                          );
-                        })()}
-                      </Link>
-                    </div>
-                    
-                    {/* 댓글 정보 */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-3">
-                        <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-medium rounded-full">
-                          #{index + 1}
-                        </span>
-                        {comment.parentCommentId && (
-                          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full flex items-center">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0L2.586 11l3.707-3.707a1 1 0 011.414 1.414L5.414 11l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                              <path fillRule="evenodd" d="M4 11a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" clipRule="evenodd" />
-                            </svg>
-                            답글
-                          </span>
-                        )}
-                        <span className="px-3 py-1 bg-purple-100 text-purple-700 text-sm rounded-full">
-                          💬 댓글 작성됨
-                        </span>
-                      </div>
-                      
-                      <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2">
-                        <Link href={`/news/${comment.newsId}`} className="hover:text-[#e53e3e] transition-colors">
-                          {comment.newsTitle || '제목 없음'}
+              {Object.entries(groupedComments).map(([newsKey, newsGroup], groupIndex) => {
+                const isExpanded = expandedNews.has(newsKey);
+                const hasMultipleComments = newsGroup.comments.length > 1;
+                
+                return (
+                  <div key={newsKey} className="p-6">
+                    {/* 뉴스 헤더 */}
+                    <div className="flex items-start gap-6 mb-4">
+                      {/* 뉴스 이미지 */}
+                      <div className="w-32 h-32 flex-shrink-0">
+                        <Link href={`/news/${newsGroup.newsId}`} className="block">
+                          {(() => {
+                            const imageUrl = getImageFromStoredNews(newsGroup.newsId, newsGroup.newsTitle);
+                            return imageUrl !== '/image/news.webp' ? (
+                              <img 
+                                src={imageUrl} 
+                                alt={newsGroup.newsTitle}
+                                className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity shadow-md"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  const parent = target.parentElement;
+                                  if (parent) {
+                                    parent.innerHTML = `
+                                      <div class="w-full h-full bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center rounded-lg border-2 border-green-200">
+                                        <div class="text-green-400 text-3xl">💬</div>
+                                      </div>
+                                    `;
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center rounded-lg border-2 border-green-200">
+                                <div className="text-green-400 text-3xl">💬</div>
+                              </div>
+                            );
+                          })()}
                         </Link>
-                      </h3>
-                      
-                      <div className="bg-gray-50 rounded-lg p-4 mb-4 border border-gray-200">
-                        <p className="text-gray-800 leading-relaxed">
-                          {comment.content}
-                        </p>
                       </div>
                       
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span className="flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
-                            </svg>
-                            {new Date(comment.createdAt).toLocaleDateString('ko-KR')} {new Date(comment.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                      {/* 뉴스 정보 */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-medium rounded-full">
+                            📰 뉴스 #{groupIndex + 1}
+                          </span>
+                          <span className="px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full">
+                            💬 {newsGroup.comments.length}개 댓글
                           </span>
                         </div>
                         
-                        <Link 
-                          href={`/news/${comment.newsId}#comment-${comment.id}`}
-                          className="px-4 py-2 bg-[#e53e3e] text-white text-sm rounded-lg hover:bg-[#c53030] transition-colors"
-                        >
-                          댓글 보기
-                        </Link>
+                        <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2">
+                          <Link href={`/news/${newsGroup.newsId}`} className="hover:text-[#e53e3e] transition-colors">
+                            {newsGroup.newsTitle || '제목 없음'}
+                          </Link>
+                        </h3>
+                        
+                        {hasMultipleComments && (
+                          <button
+                            onClick={() => toggleExpanded(newsKey)}
+                            className="flex items-center text-sm text-gray-600 hover:text-[#e53e3e] transition-colors"
+                          >
+                            <svg 
+                              className={`w-4 h-4 mr-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                            {isExpanded ? '댓글 접기' : '댓글 펼치기'}
+                          </button>
+                        )}
                       </div>
                     </div>
+                    
+                    {/* 댓글 목록 */}
+                    <div className="ml-40">
+                      {hasMultipleComments && !isExpanded ? (
+                        // 접힌 상태: 첫 번째 댓글만 표시
+                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                              최신 댓글
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(newsGroup.comments[0].createdAt).toLocaleDateString('ko-KR')} {new Date(newsGroup.comments[0].createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-gray-800 leading-relaxed">
+                            {newsGroup.comments[0].content}
+                          </p>
+                        </div>
+                      ) : (
+                        // 펼친 상태: 모든 댓글 표시
+                        <div className="space-y-3">
+                          {newsGroup.comments.map((comment, commentIndex) => (
+                            <div key={comment.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                                  #{commentIndex + 1}
+                                </span>
+                                {comment.parentCommentId && (
+                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center">
+                                    <svg className="w-2 h-2 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M7.707 14.707a1 1 0 01-1.414 0L2.586 11l3.707-3.707a1 1 0 011.414 1.414L5.414 11l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                                      <path fillRule="evenodd" d="M4 11a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                    답글
+                                  </span>
+                                )}
+                                <span className="text-xs text-gray-500">
+                                  {new Date(comment.createdAt).toLocaleDateString('ko-KR')} {new Date(comment.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              </div>
+                              <p className="text-gray-800 leading-relaxed mb-3">
+                                {comment.content}
+                              </p>
+                              <Link 
+                                href={`/news/${comment.newsId}#comment-${comment.id}`}
+                                className="inline-flex items-center px-3 py-1 bg-[#e53e3e] text-white text-xs rounded-lg hover:bg-[#c53030] transition-colors"
+                              >
+                                댓글 보기
+                              </Link>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
