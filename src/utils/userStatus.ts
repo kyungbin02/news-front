@@ -128,7 +128,7 @@ export const checkAndShowUserStatusAlert = async (): Promise<boolean> => {
         `서비스 이용 시 주의해주세요.`;
       
       alert(message);
-      return false; // 경고는 로그인 허용
+      return true;
     }
 
     // 정지 상태인 경우

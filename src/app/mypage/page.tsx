@@ -509,7 +509,7 @@ export default function MyPage() {
         <div className="max-w-7xl mx-auto">
           {/* 헤더 */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">마이페이지</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">MY 뉴스</h1>
             <p className="text-gray-600">나의 뉴스 활동과 통계를 확인해보세요</p>
           </div>
 

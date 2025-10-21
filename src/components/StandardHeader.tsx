@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import LoginModal from './LoginModal';
 import SignupModal from './SignupModal';
+import QuickSearchModal from './QuickSearchModal';
 import NotificationDropdown from './NotificationDropdown';
 import Link from 'next/link';
 import { getToken, setToken, removeToken } from '@/utils/token';
@@ -12,8 +13,10 @@ import { checkAndShowUserStatusAlert } from '@/utils/userStatus';
 export default function StandardHeader() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isSignupModalOpen, setIsSignupModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [user, setUser] = useState<{ name: string } | null>(null);
+  const [hasShownStatusAlert, setHasShownStatusAlert] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -21,6 +24,41 @@ export default function StandardHeader() {
     setIsMounted(true);
     
     const handleUrlToken = async () => {
+      // 정지된 계정 처리
+      const error = searchParams.get('error');
+      const reason = searchParams.get('reason');
+      const endDate = searchParams.get('endDate');
+      
+      if (error === 'account_suspended' && reason && endDate) {
+        const decodedReason = decodeURIComponent(reason);
+        const message = `🚫 계정 정지\n\n` +
+          `사유: ${decodedReason}\n` +
+          `정지 기간: ~ ${endDate}\n\n` +
+          `정지 기간 동안 로그인이 제한됩니다.\n` +
+          `정지 해제 후 다시 로그인해주세요.`;
+        
+        alert(message);
+        
+        // 토큰 삭제 및 메인 페이지로 이동
+        removeToken();
+        setUser(null);
+        setHasShownStatusAlert(false);
+        router.replace('/');
+        return;
+      }
+      
+      // 경고 계정 처리
+      const warning = searchParams.get('warning');
+      if (warning === 'true' && reason) {
+        const decodedReason = decodeURIComponent(reason);
+        const message = `⚠️ 경고 조치\n\n` +
+          `사유: ${decodedReason}\n\n` +
+          `서비스 이용 시 주의해주세요.`;
+        
+        alert(message);
+        setHasShownStatusAlert(true);
+      }
+      
       const tokenFromUrl = searchParams.get('token');
       if (tokenFromUrl) {
         console.log("URL에서 토큰 발견:", tokenFromUrl);
@@ -70,13 +108,22 @@ export default function StandardHeader() {
           console.log("사용자 인증 성공. UI를 업데이트합니다. 사용자 이름:", userData.username);
           setUser({ name: userData.username });
           
-          // 사용자 상태 확인 (정지 여부 체크)
-          const isSuspended = await checkAndShowUserStatusAlert();
-          if (isSuspended) {
-            // 정지된 사용자는 로그아웃 처리
-            setUser(null);
-            removeToken();
-            return;
+          // 일반 사용자만 경고/정지 알림 표시 (관리자는 제외, 한 번만)
+          const isAdmin = userData.role === 'admin' || userData.isAdmin;
+          if (!isAdmin && !hasShownStatusAlert) {
+            console.log('🔍 일반 사용자 로그인 - 사용자 상태 확인 시작');
+            setTimeout(async () => {
+              console.log('⏰ 1초 후 사용자 상태 알림 확인 실행');
+              const alertShown = await checkAndShowUserStatusAlert();
+              console.log('📢 알림 표시 결과:', alertShown);
+              if (alertShown) {
+                setHasShownStatusAlert(true);
+              }
+            }, 1000); // 1초 후에 알림 표시 (로그인 완료 후)
+          } else if (isAdmin) {
+            console.log('👨‍💼 관리자 로그인 - 사용자 상태 확인 건너뜀');
+          } else {
+            console.log('🔕 이미 알림을 표시했거나 관리자입니다.');
           }
         } else {
           console.log("백엔드에서 인증 실패 응답. 토큰을 삭제하고 로그아웃 처리합니다.");
@@ -291,33 +338,19 @@ export default function StandardHeader() {
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* 검색 아이콘 */}
+            <button
+              onClick={() => setIsSearchModalOpen(true)}
+              className="p-2 text-gray-600 hover:text-[#e53e3e] hover:bg-gray-100 rounded-full transition-all duration-200"
+              title="빠른 검색"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+            
             {/* 알림 기능 */}
             {user && <NotificationDropdown />}
-            
-            {/* 검색창 */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="뉴스검색"
-                className="py-2 px-4 pl-10 rounded-full focus:outline-none focus:ring-2 focus:ring-[#e53e3e] w-60 bg-gray-100 text-gray-900 placeholder-gray-400"
-              />
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
-            </div>
           </div>
         </div>
       </header>
@@ -344,6 +377,10 @@ export default function StandardHeader() {
               setIsSignupModalOpen(false);
               setIsLoginModalOpen(true);
             }}
+          />
+          <QuickSearchModal
+            isOpen={isSearchModalOpen}
+            onClose={() => setIsSearchModalOpen(false)}
           />
         </>
       )}

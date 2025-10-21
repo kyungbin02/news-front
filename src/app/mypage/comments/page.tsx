@@ -97,7 +97,7 @@ export default function MyCommentsPage() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              마이페이지로 돌아가기
+              MY 뉴스로 돌아가기
             </Link>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">💬 내가 쓴 댓글</h1>

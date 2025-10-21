@@ -19,6 +19,65 @@ export default function GeneralPage() {
 
   const selectedNews = news.length > 0 ? news[selectedNewsIndex] : null;
 
+  // 카테고리 한글 변환 함수
+  const getCategoryKorean = (category: string) => {
+    const categoryMap: { [key: string]: string } = {
+      'general': '일반',
+      'economy': '경제',
+      'sports': '스포츠',
+      'politics': '정치',
+      'entertainment': '연예',
+      'health': '건강',
+      'science': '과학',
+      'business': '비즈니스',
+      'world': '국제',
+      'society': '사회',
+      'culture': '문화',
+      'education': '교육',
+      'environment': '환경',
+      'lifestyle': '라이프스타일'
+    };
+    
+    return categoryMap[category?.toLowerCase()] || category || '기타';
+  };
+
+  // 뉴스 미리보기 생성 함수 (메인페이지와 동일한 로직)
+  const createNewsPreview = (article: RSSArticle, fullContent?: string): string => {
+    // description이 있으면 사용
+    if (article.description) {
+      return article.description;
+    }
+    
+    // fullContent가 있으면 텍스트만 추출해서 첫 300자
+    if (fullContent) {
+      const textOnly = fullContent
+        .replace(/<[^>]*>/g, '') // HTML 태그 제거
+        .replace(/&nbsp;/g, ' ') // &nbsp; 제거
+        .replace(/\s+/g, ' ') // 연속 공백 제거
+        .trim();
+      
+      if (textOnly.length > 300) {
+        return textOnly.substring(0, 300) + '...';
+      }
+      return textOnly;
+    }
+    
+    return '기사 미리보기를 불러올 수 없습니다.';
+  };
+
+  // 본문에서 첫 번째 이미지 추출 (메인페이지와 동일한 로직)
+  const extractFirstImage = (html: string): string | null => {
+    if (!html) return null;
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    return imgMatch ? imgMatch[1] : null;
+  };
+
+  // 고화질 이미지 URL 생성 (메인페이지와 동일한 로직)
+  const getHighQualityImageUrl = (article: RSSArticle, fullContent?: string): string => {
+    const contentImageUrl = fullContent ? extractFirstImage(fullContent) : null;
+    return contentImageUrl || article.imageUrl || '/image/news.webp';
+  };
+
   const handleNewsSelect = (index: number) => {
     setSelectedNewsIndex(index);
   };
@@ -75,70 +134,57 @@ export default function GeneralPage() {
       setLoading(true);
       try {
         try {
-          // 모든 카테고리의 뉴스를 가져오기
-          const categories = ['general', 'economy', 'sports'];
-          const allNewsPromises = categories.map(async (category) => {
-            try {
-              const response = await fetch(`http://localhost:8080/api/news?category=${category}&page=1&size=50`, {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                mode: 'cors',
-              });
-              if (response.ok) {
-                const data = await response.json();
-                if (data.success && data.data && data.data.length > 0) {
-                  return data.data
-                    .filter((news: any) => news.title)
-                    .map((news: any, index: number) => ({
-                      id: `${category}-${news.newsId || index}-${Date.now()}`, // 고유한 키 생성
-                      title: news.title,
-                      description: (news.content || '').substring(0, 200) + '...',
-                      link: `/news/${news.newsId || `${category}-${index}`}`,
-                      category: news.category || category,
-                      source: news.source || '알 수 없는 출처',
-                      imageUrl: news.imageUrl || '/image/news.webp',
-                      pubDate: news.createdAt || new Date().toISOString()
-                    }));
-                }
-              }
-            } catch (error) {
-              console.error(`Failed to load ${category} news:`, error);
-            }
-            return [];
+          // 백엔드에서 전체 뉴스 가져오기 (단일 API 호출)
+          const response = await fetch('http://localhost:8080/api/news?page=1&size=100', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            mode: 'cors',
           });
-
-          const allCategoryNews = await Promise.all(allNewsPromises);
-          const combinedNews = allCategoryNews.flat();
           
-          // 중복 제거 (같은 newsId를 가진 뉴스 제거)
-          const uniqueNews = combinedNews.reduce((acc: any[], current: any) => {
-            const existingNews = acc.find(news => 
-              news.title === current.title && news.source === current.source
-            );
-            if (!existingNews) {
-              acc.push({
-                ...current,
-                id: `unique-${acc.length}-${Date.now()}` // 고유한 키로 재생성
-              });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data && data.data.length > 0) {
+              const backendNews = data.data
+                .filter((news: any) => news.title)
+                .map((news: any, index: number) => {
+                  const article: RSSArticle = {
+                    id: news.newsId ? news.newsId.toString() : `backend-${index}`,
+                    title: news.title,
+                    description: news.description || '',
+                    link: `/news/${news.newsId || `backend-${index}`}`,
+                    category: news.category || 'general',
+                    source: news.source || '알 수 없는 출처',
+                    imageUrl: news.imageUrl || '/image/news.webp',
+                    pubDate: news.createdAt || new Date().toISOString()
+                  };
+                  
+                  // 미리보기 생성 (메인페이지와 동일한 로직)
+                  const preview = createNewsPreview(article, news.content);
+                  
+                  // 고화질 이미지 URL 생성 (메인페이지와 동일한 로직)
+                  const highQualityImageUrl = getHighQualityImageUrl(article, news.content);
+                  
+                  return {
+                    ...article,
+                    description: preview,
+                    imageUrl: highQualityImageUrl
+                  };
+                });
+              
+              console.log('백엔드에서 전체 뉴스 로드:', backendNews.length);
+              
+              if (backendNews.length > 0) {
+                setNews(backendNews);
+                const totalPages = Math.ceil(backendNews.length / articlesPerPage);
+                setTotalPages(totalPages);
+                setCurrentPage(1);
+                saveArticlesToStorage(backendNews);
+                setLoading(false);
+                return;
+              } else {
+                console.log('No valid news from backend, using RSS fallback');
+              }
             }
-            return acc;
-          }, []);
-          
-          // 최신순으로 정렬
-          uniqueNews.sort((a, b) => new Date(b.pubDate).getTime() - new Date(a.pubDate).getTime());
-          
-          console.log('백엔드에서 모든 뉴스 로드:', uniqueNews.length);
-          
-          if (uniqueNews.length > 0) {
-            setNews(uniqueNews);
-            const totalPages = Math.ceil(uniqueNews.length / articlesPerPage);
-            setTotalPages(totalPages);
-            setCurrentPage(1);
-            saveArticlesToStorage(uniqueNews);
-            setLoading(false);
-            return;
-          } else {
-            console.log('No valid news from backend, using RSS fallback');
           }
         } catch (backendError) {
           console.error('Backend failed, trying RSS fallback:', backendError);
@@ -200,6 +246,34 @@ export default function GeneralPage() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+  };
+
+  // 개선된 페이지네이션 로직
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5; // 최대 5개 페이지 표시
+    
+    if (totalPages <= maxVisiblePages) {
+      // 전체 페이지가 5개 이하면 모두 표시
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // 현재 페이지 주변 5개만 표시
+      let startPage = Math.max(1, currentPage - 2);
+      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+      
+      // 끝에서 시작하는 경우 조정
+      if (endPage - startPage < maxVisiblePages - 1) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+      }
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+    }
+    
+    return pages;
   };
 
   return (
@@ -337,7 +411,7 @@ export default function GeneralPage() {
                           {article.title}
                         </h3>
                         <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
-                          {article.description || "최신 뉴스와 다양한 소식을 확인해보세요."}
+                          {createNewsPreview(article)}
                         </p>
                         
                         {/* 카드 정보 - 깔끔한 스타일 */}
@@ -401,10 +475,22 @@ export default function GeneralPage() {
                 )}
               </div>
 
-              {/* 페이지네이션 */}
+              {/* 개선된 페이지네이션 */}
               {totalPages > 1 && (
                 <div className="flex justify-center mt-12">
                   <div className="flex items-center space-x-2">
+                    {/* 이전 페이지 그룹 버튼 */}
+                    {currentPage > 3 && (
+                      <button
+                        onClick={() => handlePageChange(Math.max(1, currentPage - 5))}
+                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                        title="이전 페이지 그룹"
+                      >
+                        «
+                      </button>
+                    )}
+                    
+                    {/* 이전 버튼 */}
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
@@ -413,7 +499,8 @@ export default function GeneralPage() {
                       이전
                     </button>
                     
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    {/* 페이지 번호들 */}
+                    {getPageNumbers().map((page) => (
                       <button
                         key={page}
                         onClick={() => handlePageChange(page)}
@@ -427,6 +514,7 @@ export default function GeneralPage() {
                       </button>
                     ))}
                     
+                    {/* 다음 버튼 */}
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
@@ -434,6 +522,17 @@ export default function GeneralPage() {
                     >
                       다음
                     </button>
+                    
+                    {/* 다음 페이지 그룹 버튼 */}
+                    {currentPage < totalPages - 2 && (
+                      <button
+                        onClick={() => handlePageChange(Math.min(totalPages, currentPage + 5))}
+                        className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                        title="다음 페이지 그룹"
+                      >
+                        »
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

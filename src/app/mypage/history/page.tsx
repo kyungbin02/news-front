@@ -109,7 +109,7 @@ export default function HistoryPage() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              마이페이지로 돌아가기
+              MY 뉴스로 돌아가기
             </Link>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">👁️ 열람 기록</h1>
@@ -117,7 +117,7 @@ export default function HistoryPage() {
         </div>
 
         {/* 통계 카드 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6 text-center">
             <div className="text-3xl mb-2">📖</div>
             <div className="text-2xl font-bold text-[#e53e3e] mb-1">{viewHistory?.length || 0}</div>
@@ -133,13 +133,6 @@ export default function HistoryPage() {
               }).length || 0}
             </div>
             <div className="text-sm text-gray-600">오늘 열람</div>
-          </div>
-          <div className="bg-white rounded-lg shadow p-6 text-center">
-            <div className="text-3xl mb-2">⏱️</div>
-            <div className="text-2xl font-bold text-green-600 mb-1">
-              {viewHistory?.reduce((total, h) => total + (h.readTime || 0), 0) || 0}초
-            </div>
-            <div className="text-sm text-gray-600">총 읽은 시간</div>
           </div>
         </div>
           
@@ -207,21 +200,13 @@ export default function HistoryPage() {
                             </svg>
                             {new Date(history.viewedAt).toLocaleDateString('ko-KR')} {new Date(history.viewedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                           </span>
-                          {history.readTime > 0 && (
-                            <span className="flex items-center">
-                              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
-                              </svg>
-                              {Math.floor(history.readTime / 60)}분 {history.readTime % 60}초 읽음
-                            </span>
-                          )}
                         </div>
                         
                         <Link 
                           href={`/news/${history.newsId}`}
                           className="px-4 py-2 bg-[#e53e3e] text-white text-sm rounded-lg hover:bg-[#c53030] transition-colors"
                         >
-                          다시 읽기
+                          읽기
                         </Link>
                       </div>
                     </div>

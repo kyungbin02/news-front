@@ -11,6 +11,7 @@ import CommentSection from '@/components/CommentSection';
 import { getToken, isTokenValid } from '@/utils/token';
 import LoginModal from '@/components/LoginModal';
 import SignupModal from '@/components/SignupModal';
+import NewsDetailSidebar from '@/components/NewsDetailSidebar';
 
 interface NewsDetailPageProps {
   params: Promise<{
@@ -30,6 +31,16 @@ export default function NewsDetailPage({ params }: NewsDetailPageProps) {
   const [bookmarkId, setBookmarkId] = useState<number | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSignupModal, setShowSignupModal] = useState(false);
+
+  // 본문에서 첫 번째 이미지 추출
+  const extractFirstImage = (html: string): string | null => {
+    if (!html) return null;
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    return imgMatch ? imgMatch[1] : null;
+  };
+
+  const contentImageUrl = fullContent ? extractFirstImage(fullContent) : null;
+  const displayImageUrl = contentImageUrl || article?.imageUrl;
 
   // useRef로 추적 상태 관리 (무한 렌더링 방지)
   const hasTrackedViewRef = useRef(false);
@@ -403,154 +414,167 @@ export default function NewsDetailPage({ params }: NewsDetailPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 헤더 섹션 */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <Link
-              href="/"
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              홈으로 돌아가기
-            </Link>
-                  
-                  <div className="flex items-center space-x-4">
-                    <button
-                onClick={handleBookmarkToggle}
-                className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-                        isBookmarked 
-                    ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <svg className="w-5 h-5 mr-2" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                        {isBookmarked ? '북마크됨' : '북마크'}
-                    </button>
-              
-              <button
-                onClick={handleShare}
-                className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                </svg>
-                공유
-              </button>
-            </div>
-                    </div>
-                  </div>
-                </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
                 
       {/* 메인 콘텐츠 */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          {/* 뉴스 메타 정보 */}
-          <div className="mb-8">
-            <div className="flex items-center space-x-4 mb-4">
-              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getSourceColor(article.source)}`}>
-                {article.source}
-              </span>
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                {getCategoryKorean(article.category)}
-              </span>
-              <span className="text-gray-500 text-sm">
-                {new Date(article.pubDate).toLocaleDateString('ko-KR', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </span>
+      <div className="container mx-auto px-0 py-8">
+        <div className="max-w-7xl ml-auto flex justify-end pr-0">
+          <div className="flex gap-8 w-full">
+            {/* 메인 콘텐츠 영역 */}
+            <div className="flex-1">
+          {/* 뉴스 헤더 카드 */}
+          <div className="bg-white shadow-lg border-l-4 border-blue-500 p-8">
+            <div className="flex items-center justify-between gap-3 mb-6">
+              <div className="flex items-center gap-3">
+                <span className={`px-4 py-1.5 text-sm font-bold ${getSourceColor(article.source)}`}>
+                  {article.source}
+                </span>
+                <span className="px-4 py-1.5 bg-blue-100 text-blue-800 text-sm font-bold border border-blue-200">
+                  {getCategoryKorean(article.category)}
+                </span>
+                <span className="text-gray-500 text-sm font-medium">
+                  {new Date(article.pubDate).toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleBookmarkToggle}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                    isBookmarked 
+                      ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  북마크
+                </button>
+
+                <button
+                  onClick={handleShare}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 transition-all duration-200"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                  </svg>
+                  공유
+                </button>
+              </div>
             </div>
             
-            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 leading-tight mb-6">
+            <h1 className="text-3xl lg:text-5xl font-extrabold text-gray-900 leading-tight">
               {article.title}
             </h1>
-            
-            {article.description && (
-              <p className="text-xl text-gray-600 leading-relaxed mb-6">
-                {article.description}
-              </p>
-            )}
           </div>
 
           {/* 뉴스 이미지 */}
-          {article.imageUrl && (
-            <div className="mb-8">
-              <div className="relative w-full h-64 lg:h-96 rounded-2xl overflow-hidden shadow-lg">
+          {displayImageUrl && (
+            <div className="overflow-hidden shadow-xl">
+              <div className="relative w-full h-72 lg:h-[500px]">
                       <img
-                        src={article.imageUrl}
+                        src={displayImageUrl}
                         alt={article.title}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.src = '/image/news.webp';
                   }}
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
                   </div>
                 </div>
           )}
 
-          {/* 뉴스 본문 */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-8">
-            <div className="prose prose-lg max-w-none text-center">
-              {fullContent ? (
-                <div 
-                  className="text-gray-800 leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: fullContent }}
-                />
-              ) : (
-                <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-                  {article.description}
-                </div>
-              )}
+          {/* 뉴스 미리보기 */}
+          <div className="bg-white shadow-lg border-l-4 border-indigo-500 p-8">
+            {/* 기사 미리보기 */}
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+                <div className="w-1 h-8 bg-indigo-500"></div>
+                <h3 className="text-2xl font-bold text-gray-900">기사 미리보기</h3>
+              </div>
+              <div className="text-gray-800 text-lg leading-relaxed pl-4 border-l-2 border-gray-200">
+                {(() => {
+                  // description이 있으면 사용
+                  if (article.description) {
+                    return article.description;
+                  }
+                  
+                  // fullContent가 있으면 텍스트만 추출해서 첫 300자
+                  if (fullContent) {
+                    const textOnly = fullContent
+                      .replace(/<[^>]*>/g, '') // HTML 태그 제거
+                      .replace(/&nbsp;/g, ' ') // &nbsp; 제거
+                      .replace(/\s+/g, ' ') // 연속 공백 제거
+                      .trim();
+                    
+                    if (textOnly.length > 300) {
+                      return textOnly.substring(0, 300) + '...';
+                    }
+                    return textOnly;
+                  }
+                  
+                  return '기사 미리보기를 불러올 수 없습니다.';
+                })()}
+              </div>
             </div>
-            
-            {/* 원문보기 버튼 */}
-            <div className="mt-8 text-center">
+
+            {/* 전체 기사 보기 버튼 */}
+            <div className="text-center pt-6 border-t-2 border-gray-100">
               <a
                 href={article.url || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => {
-                  console.log('🔍 원문보기 클릭 - URL:', article.url);
-                  console.log('🔍 전체 아티클:', article);
-                  
-                  // URL이 없거나 #이면 기본 동작 방지
                   if (!article.url || article.url === '#') {
                     e.preventDefault();
-                    console.log('❌ 유효한 URL이 없어서 클릭 방지됨');
+                    alert('원문 링크를 찾을 수 없습니다.');
                     return;
                   }
-                  
-                  console.log('✅ 유효한 URL로 이동:', article.url);
                 }}
-                className={`inline-flex items-center space-x-2 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold ${
+                className={`inline-flex items-center gap-4 px-12 py-4 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl font-bold text-lg ${
                   article.url 
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700' 
                     : 'bg-gray-400 text-white cursor-not-allowed'
                 }`}
               >
-                <span>🔗</span>
-                <span>원문 보기</span>
-                <span>↗</span>
+                <span className="text-xl">📰</span>
+                <span>전체 기사 읽기</span>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
               </a>
+              <p className="text-gray-500 text-sm mt-4 font-medium">
+                원문 사이트에서 전체 기사를 확인하실 수 있습니다
+              </p>
             </div>
           </div>
             
           {/* 댓글 섹션 */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+          <div className="bg-white shadow-lg border-l-4 border-green-500 p-8 mt-6">
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b-2 border-gray-100">
+              <div className="w-1 h-8 bg-green-500"></div>
+              <h3 className="text-2xl font-bold text-gray-900">댓글</h3>
+            </div>
             <CommentSection 
               newsId={id} 
               onLoginRequired={() => setShowLoginModal(true)}
             />
+          </div>
+            </div>
+            
+            {/* 사이드바 영역 */}
+            <div className="hidden lg:block sticky top-8 self-start">
+              <NewsDetailSidebar />
+            </div>
           </div>
         </div>
       </div>
@@ -570,13 +594,8 @@ export default function NewsDetailPage({ params }: NewsDetailPageProps) {
       <SignupModal
         isOpen={showSignupModal}
         onClose={() => setShowSignupModal(false)}
-        onLoginClick={() => {
+        onSwitchToLogin={() => {
           setShowSignupModal(false);
-          setShowLoginModal(true);
-        }}
-        onSignupSuccess={() => {
-          setShowSignupModal(false);
-          // 회원가입 성공 후 로그인 모달 표시
           setShowLoginModal(true);
         }}
       />

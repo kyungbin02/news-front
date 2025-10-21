@@ -29,6 +29,65 @@ export default function EconomyPage() {
   // 현재 선택된 뉴스 가져오기
   const selectedNews = news.length > 0 ? news[selectedNewsIndex] : null;
 
+  // 카테고리 한글 변환 함수
+  const getCategoryKorean = (category: string) => {
+    const categoryMap: { [key: string]: string } = {
+      'general': '일반',
+      'economy': '경제',
+      'sports': '스포츠',
+      'politics': '정치',
+      'entertainment': '연예',
+      'health': '건강',
+      'science': '과학',
+      'business': '비즈니스',
+      'world': '국제',
+      'society': '사회',
+      'culture': '문화',
+      'education': '교육',
+      'environment': '환경',
+      'lifestyle': '라이프스타일'
+    };
+    
+    return categoryMap[category?.toLowerCase()] || category || '기타';
+  };
+
+  // 뉴스 미리보기 생성 함수 (메인페이지와 동일한 로직)
+  const createNewsPreview = (article: RSSArticle, fullContent?: string): string => {
+    // description이 있으면 사용
+    if (article.description) {
+      return article.description;
+    }
+    
+    // fullContent가 있으면 텍스트만 추출해서 첫 300자
+    if (fullContent) {
+      const textOnly = fullContent
+        .replace(/<[^>]*>/g, '') // HTML 태그 제거
+        .replace(/&nbsp;/g, ' ') // &nbsp; 제거
+        .replace(/\s+/g, ' ') // 연속 공백 제거
+        .trim();
+      
+      if (textOnly.length > 300) {
+        return textOnly.substring(0, 300) + '...';
+      }
+      return textOnly;
+    }
+    
+    return '기사 미리보기를 불러올 수 없습니다.';
+  };
+
+  // 본문에서 첫 번째 이미지 추출 (메인페이지와 동일한 로직)
+  const extractFirstImage = (html: string): string | null => {
+    if (!html) return null;
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    return imgMatch ? imgMatch[1] : null;
+  };
+
+  // 고화질 이미지 URL 생성 (메인페이지와 동일한 로직)
+  const getHighQualityImageUrl = (article: RSSArticle, fullContent?: string): string => {
+    const contentImageUrl = fullContent ? extractFirstImage(fullContent) : null;
+    return contentImageUrl || article.imageUrl || '/image/news.webp';
+  };
+
   const handleNewsSelect = (index: number) => {
     setSelectedNewsIndex(index);
   };
@@ -138,10 +197,76 @@ export default function EconomyPage() {
 
   useEffect(() => {
     const loadNews = async () => {
-      console.log('Starting to load RSS news...');
+      console.log('Starting to load economy news...');
       setLoading(true);
       try {
-        console.log('Calling fetchRSSNews...');
+        // 백엔드에서 경제 뉴스 가져오기 (우선 시도)
+        try {
+          const response = await fetch('http://localhost:8080/api/news?category=economy&page=1&size=100', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            mode: 'cors',
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data && data.data.length > 0) {
+              // 백엔드 데이터를 프론트엔드 형식으로 변환
+              const backendNews = data.data
+                .filter((news: any) => news.title)
+                .map((news: any, index: number) => {
+                  const article: RSSArticle = {
+                    id: news.newsId ? news.newsId.toString() : `backend-${index}`,
+                    title: news.title,
+                    description: news.description || '', // 원본 description 사용
+                    link: `/news/${news.newsId || `backend-${index}`}`,
+                    url: news.url || news.link,
+                    category: news.category || '경제',
+                    source: news.source || '알 수 없는 출처',
+                    imageUrl: news.imageUrl || '/image/news.webp',
+                    pubDate: news.createdAt || new Date().toISOString()
+                  };
+                  
+                  // 미리보기 생성 (메인페이지와 동일한 로직)
+                  const preview = createNewsPreview(article, news.content);
+                  
+                  // 고화질 이미지 URL 생성 (메인페이지와 동일한 로직)
+                  const highQualityImageUrl = getHighQualityImageUrl(article, news.content);
+                  
+                  return {
+                    ...article,
+                    description: preview,
+                    imageUrl: highQualityImageUrl
+                  };
+                })
+                .filter((article: any) => {
+                  // 경제 카테고리만 필터링
+                  const category = article.category?.toLowerCase();
+                  return category === 'economy' || category === 'economic' || category === 'business' || category === '경제';
+                });
+              
+              console.log('Loaded economy news from backend:', backendNews.length);
+              
+              if (backendNews.length > 0) {
+                setNews(backendNews);
+                setAllNews(backendNews);
+                
+                // 백엔드에서 제공하는 페이지네이션 정보 사용
+                setTotalPages(Math.ceil(backendNews.length / articlesPerPage));
+                setCurrentPage(1);
+                
+                saveArticlesToStorage(backendNews);
+                setLoading(false);
+                return; // 백엔드 성공 시 RSS는 건너뛰기
+              }
+            }
+          }
+        } catch (backendError) {
+          console.error('Backend failed, trying RSS fallback:', backendError);
+        }
+        
+        // 백엔드 실패 시 RSS fallback
+        console.log('Using RSS fallback for economy news...');
         const newsData = await fetchRSSNews('economy', -1);
         console.log('Received RSS news data:', newsData);
         
@@ -586,7 +711,7 @@ export default function EconomyPage() {
                               {article.title}
                             </h3>
                             <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
-                              {article.description}
+                              {createNewsPreview(article)}
                             </p>
                             <div className="flex justify-between items-center pt-3 border-t border-gray-100">
                               <div className="flex items-center space-x-2">
@@ -749,7 +874,7 @@ export default function EconomyPage() {
                               {article.title}
                             </h4>
                             <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                              {article.description}
+                              {createNewsPreview(article)}
                             </p>
                             <div className="flex items-center justify-between text-xs text-gray-500">
                               <span>{article.source}</span>

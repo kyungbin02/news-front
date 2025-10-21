@@ -2,7 +2,6 @@
 
 import React, { useEffect } from "react";
 import { getAuthHeader, setToken } from "@/utils/token";
-import { checkAndShowUserStatusAlert } from "@/utils/userStatus";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -44,25 +43,29 @@ const LoginModal: React.FC<LoginModalProps> = ({
         const contentType = response.headers.get("content-type");
         if (contentType && contentType.includes("application/json")) {
           const userData = await response.json();
-            if (userData.isAuthenticated) {
-              if (userData.token) {
-                // 중괄호 제거하여 순수한 JWT 토큰만 저장
-                const cleanToken = userData.token.replace(/[{}]/g, '');
-                console.log("백엔드에서 받은 토큰:", userData.token);
-                console.log("정리된 토큰:", cleanToken);
-                setToken(cleanToken);
-              }
+          if (userData.isAuthenticated) {
+            if (userData.token) {
+              // 중괄호 제거하여 순수한 JWT 토큰만 저장
+              const cleanToken = userData.token.replace(/[{}]/g, '');
+              console.log("🔑 로그인 성공 - 토큰 처리 시작");
+              console.log("백엔드에서 받은 토큰:", userData.token);
+              console.log("정리된 토큰:", cleanToken);
               
-              // 사용자 상태 확인 (정지 여부 체크)
-              const isSuspended = await checkAndShowUserStatusAlert();
-              if (isSuspended) {
-                // 정지된 사용자는 로그인 성공하지 않음
-                return;
-              }
+              setToken(cleanToken);
               
-              onLoginSuccess({ name: userData.name });
-              onClose();
+              // 토큰 저장 후 즉시 확인
+              const savedToken = localStorage.getItem('jwt_token');
+              console.log("🔍 토큰 저장 후 확인:", {
+                저장됨: !!savedToken,
+                토큰길이: savedToken ? savedToken.length : 0,
+                토큰미리보기: savedToken ? `${savedToken.substring(0, 20)}...` : '없음'
+              });
+            } else {
+              console.log("❌ 백엔드에서 토큰을 받지 못함");
             }
+            onLoginSuccess({ name: userData.name });
+            onClose();
+          }
         }
       } catch (error) {
         console.error("Error fetching user data:", error);

@@ -22,6 +22,7 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
   const [replies, setReplies] = useState<Record<number, Comment[]>>({});
   const [openCommentActionMenu, setOpenCommentActionMenu] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState(5); // 처음에 보이는 댓글 개수
 
   const isAuthed = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -74,6 +75,19 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
     try {
       const data = await getComments(newsId);
       setComments(data);
+      
+      // 각 댓글의 대댓글도 함께 로드
+      for (const comment of data) {
+        try {
+          const replyData = await getReplies(comment.commentId);
+          setReplies((prev) => ({
+            ...prev,
+            [comment.commentId]: replyData
+          }));
+        } catch (error) {
+          console.error(`댓글 ${comment.commentId}의 대댓글 로드 실패:`, error);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -143,9 +157,22 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
     try {
       const ok = await updateComment(commentId, editContent.trim());
       if (ok) {
+        // 일반 댓글 업데이트
         setComments((prev) => prev.map((c) => 
           c.commentId === commentId ? { ...c, content: editContent.trim() } : c
         ));
+        
+        // 대댓글 업데이트
+        setReplies((prev) => {
+          const newReplies = { ...prev };
+          for (const parentId in newReplies) {
+            newReplies[parentId] = newReplies[parentId].map((reply) =>
+              reply.commentId === commentId ? { ...reply, content: editContent.trim() } : reply
+            );
+          }
+          return newReplies;
+        });
+        
         setEditingId(null);
         setEditContent('');
       } else {
@@ -204,7 +231,7 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
         [parentId]: [...(prev[parentId] || []), created]
       }));
       setReplyContent('');
-      setReplyingTo(null);
+      // 대댓글 작성 후에도 입력창 유지 (setReplyingTo(null) 제거)
     } catch (err) {
       console.error('대댓글 작성 중 오류:', err);
       alert('대댓글 작성 실패. 로그인/권한을 확인해주세요.');
@@ -234,14 +261,7 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
   });
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-8 border border-gray-200">
-      <div className="p-8">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-          <span className="text-3xl mr-3">💬</span>
-          <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            댓글 ({comments.length})
-          </span>
-        </h3>
+    <div>
 
         {/* 댓글 작성 폼 */}
         <div className="mb-6">
@@ -289,14 +309,12 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
             <span className="ml-3 text-gray-600">댓글을 불러오는 중...</span>
           </div>
         ) : comments.length === 0 ? (
-          <div className="text-center py-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300">
-            <div className="text-5xl mb-4">💭</div>
-            <h4 className="text-xl font-bold text-gray-700 mb-3">첫 댓글을 남겨보세요!</h4>
-            <p className="text-gray-600">이 뉴스에 대한 여러분의 생각을 공유해주세요.</p>
+          <div className="text-center py-12 bg-gray-50 border border-gray-200">
+            <p className="text-gray-500 text-sm">첫 댓글을 남겨보세요!</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {comments.map((c) => (
+            {comments.slice(0, visibleCount).map((c) => (
               <div key={c.commentId} className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <div className="flex-1">
@@ -310,7 +328,7 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
                       
                       {/* 액션 메뉴 버튼 - 본인의 댓글에만 표시 */}
                       {!editingId && currentUserId && c.userId === currentUserId && (
-                        <div className="relative action-menu">
+                        <div className="relative action-menu" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setOpenCommentActionMenu(openCommentActionMenu === c.commentId ? null : c.commentId)}
                             className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded"
@@ -388,16 +406,21 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
                               onLoginRequired();
                               return;
                             }
-                            if (replies[c.commentId]) {
+                            if (replyingTo === c.commentId) {
                               setReplyingTo(null);
                             } else {
                               setReplyingTo(c.commentId);
                               loadReplies(c.commentId);
                             }
                           }}
-                          className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                          className="text-sm text-gray-600 hover:text-blue-600 transition-colors flex items-center gap-1"
                         >
                           💬 답글 작성
+                          {replies[c.commentId] && replies[c.commentId].length > 0 && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+                              {replies[c.commentId].length}
+                            </span>
+                          )}
                         </button>
                       </div>
                     )}
@@ -452,8 +475,8 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
                       </div>
                     )}
                     
-                    {/* 대댓글 목록 */}
-                    {replies[c.commentId] && replies[c.commentId].length > 0 && (
+                    {/* 대댓글 목록 - 답글 작성 버튼을 눌렀을 때만 표시 */}
+                    {replyingTo === c.commentId && replies[c.commentId] && replies[c.commentId].length > 0 && (
                       <div className="ml-6 space-y-3 border-l-2 border-blue-200 pl-4 mt-3">
                         {replies[c.commentId].map((reply) => (
                           <div key={reply.commentId} className="bg-white rounded p-3">
@@ -506,9 +529,40 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
                                 </div>
                               )}
                             </div>
-                            <div className="text-gray-700 text-sm">
-                              {reply.content}
-                            </div>
+                            
+                            {/* 대댓글 내용 또는 수정 폼 */}
+                            {editingId === reply.commentId ? (
+                              <div className="mb-2">
+                                <input
+                                  type="text"
+                                  value={editContent}
+                                  onChange={(e) => setEditContent(e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  placeholder="댓글 수정..."
+                                />
+                                <div className="flex gap-2 mt-2">
+                                  <button
+                                    onClick={() => onUpdate(reply.commentId)}
+                                    className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                                  >
+                                    저장
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingId(null);
+                                      setEditContent('');
+                                    }}
+                                    className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-gray-700 text-sm">
+                                {reply.content}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -517,9 +571,20 @@ export default function CommentSection({ newsId, onLoginRequired }: Props) {
                 </div>
               </div>
             ))}
+            
+            {/* 더보기 버튼 */}
+            {visibleCount < comments.length && (
+              <div className="text-center pt-4">
+                <button
+                  onClick={() => setVisibleCount(prev => prev + 5)}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                >
+                  댓글 더보기 ({comments.length - visibleCount}개 남음)
+                </button>
+              </div>
+            )}
           </div>
         )}
-      </div>
     </div>
   );
 }

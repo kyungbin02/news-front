@@ -29,6 +29,65 @@ export default function SportsPage() {
   // 현재 선택된 뉴스 가져오기
   const selectedNews = news.length > 0 ? news[selectedNewsIndex] : null;
 
+  // 카테고리 한글 변환 함수
+  const getCategoryKorean = (category: string) => {
+    const categoryMap: { [key: string]: string } = {
+      'general': '일반',
+      'economy': '경제',
+      'sports': '스포츠',
+      'politics': '정치',
+      'entertainment': '연예',
+      'health': '건강',
+      'science': '과학',
+      'business': '비즈니스',
+      'world': '국제',
+      'society': '사회',
+      'culture': '문화',
+      'education': '교육',
+      'environment': '환경',
+      'lifestyle': '라이프스타일'
+    };
+    
+    return categoryMap[category?.toLowerCase()] || category || '기타';
+  };
+
+  // 뉴스 미리보기 생성 함수 (메인페이지와 동일한 로직)
+  const createNewsPreview = (article: RSSArticle, fullContent?: string): string => {
+    // description이 있으면 사용
+    if (article.description) {
+      return article.description;
+    }
+    
+    // fullContent가 있으면 텍스트만 추출해서 첫 300자
+    if (fullContent) {
+      const textOnly = fullContent
+        .replace(/<[^>]*>/g, '') // HTML 태그 제거
+        .replace(/&nbsp;/g, ' ') // &nbsp; 제거
+        .replace(/\s+/g, ' ') // 연속 공백 제거
+        .trim();
+      
+      if (textOnly.length > 300) {
+        return textOnly.substring(0, 300) + '...';
+      }
+      return textOnly;
+    }
+    
+    return '기사 미리보기를 불러올 수 없습니다.';
+  };
+
+  // 본문에서 첫 번째 이미지 추출 (메인페이지와 동일한 로직)
+  const extractFirstImage = (html: string): string | null => {
+    if (!html) return null;
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    return imgMatch ? imgMatch[1] : null;
+  };
+
+  // 고화질 이미지 URL 생성 (메인페이지와 동일한 로직)
+  const getHighQualityImageUrl = (article: RSSArticle, fullContent?: string): string => {
+    const contentImageUrl = fullContent ? extractFirstImage(fullContent) : null;
+    return contentImageUrl || article.imageUrl || '/image/news.webp';
+  };
+
   const handleNewsSelect = (index: number) => {
     setSelectedNewsIndex(index);
   };
@@ -150,11 +209,22 @@ export default function SportsPage() {
       try {
         // 백엔드에서 뉴스 가져오기 (우선 시도)
         try {
-          const response = await fetch('http://localhost:8080/api/news?category=sports&page=1&size=50', {
+          // 스포츠 카테고리로 먼저 시도
+          let response = await fetch('http://localhost:8080/api/news?category=sports&page=1&size=50', {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             mode: 'cors',
           });
+          
+          // 스포츠 카테고리가 없으면 전체 뉴스에서 필터링
+          if (!response.ok) {
+            console.log('Sports category not found, trying all news...');
+            response = await fetch('http://localhost:8080/api/news?page=1&size=100', {
+              method: 'GET',
+              headers: { 'Accept': 'application/json' },
+              mode: 'cors',
+            });
+          }
           
           if (response.ok) {
             const data = await response.json();
@@ -162,24 +232,36 @@ export default function SportsPage() {
               // 백엔드 데이터를 프론트엔드 형식으로 변환 (유효한 데이터만)
               const backendNews = data.data
                 .filter((news: any) => news.title) // title만 체크 (newsId는 나중에 생성)
-                .map((news: any, index: number) => ({
-                  id: news.newsId ? news.newsId.toString() : `sports-${index}`,
-                  title: news.title,
-                  description: (news.content || '').substring(0, 200) + '...',
-                  link: `/news/${news.newsId || `sports-${index}`}`,
-                  category: news.category || 'sports',
-                  source: news.source || '알 수 없는 출처', // 실제 언론사명 사용
-                  imageUrl: news.imageUrl || '/image/news.webp', // 기본 이미지 설정
-                  pubDate: news.createdAt || new Date().toISOString()
-                }))
-                .filter((article: any) => {
-                  // 메인페이지와 동일한 카테고리 기반 필터링
-                  const category = article.category?.toLowerCase();
-                  return category === 'sports' || category === 'sport';
-                });
+                .map((news: any, index: number) => {
+                  const article: RSSArticle = {
+                    id: news.newsId ? news.newsId.toString() : `sports-${index}`,
+                    title: news.title,
+                    description: news.description || '', // 원본 description 사용
+                    link: `/news/${news.newsId || `sports-${index}`}`,
+                    url: news.url || news.link, // 원문 URL 추가
+                    category: news.category || 'sports',
+                    source: news.source || '알 수 없는 출처', // 실제 언론사명 사용
+                    imageUrl: news.imageUrl || '/image/news.webp', // 기본 이미지 설정
+                    pubDate: news.createdAt || new Date().toISOString()
+                  };
+                  
+                  // 미리보기 생성 (메인페이지와 동일한 로직)
+                  const preview = createNewsPreview(article, news.content);
+                  
+                  // 고화질 이미지 URL 생성 (메인페이지와 동일한 로직)
+                  const highQualityImageUrl = getHighQualityImageUrl(article, news.content);
+                  
+                  return {
+                    ...article,
+                    description: preview,
+                    imageUrl: highQualityImageUrl
+                  };
+                })
+                // 백엔드에서 이미 스포츠 카테고리로 필터링된 뉴스를 제공하므로 추가 필터링 불필요
               
               console.log('Loaded sports news from backend:', backendNews.length);
               console.log('First news item:', backendNews[0]);
+              console.log('Backend news categories:', backendNews.map((n: any) => n.category));
               
               // 유효한 뉴스가 있을 때만 사용
               if (backendNews.length > 0) {
@@ -187,15 +269,17 @@ export default function SportsPage() {
                 setNews(backendNews);
                 setAllNews(backendNews); // 전체 뉴스 저장
                 
-                const totalPages = Math.ceil(backendNews.length / articlesPerPage);
-                setTotalPages(totalPages);
+                // 백엔드에서 제공하는 페이지네이션 정보 사용
+                setTotalPages(Math.ceil(backendNews.length / articlesPerPage));
                 setCurrentPage(1);
                 
                 saveArticlesToStorage(backendNews);
                 setLoading(false); // 로딩 완료
                 return; // 백엔드 성공 시 RSS는 건너뛰기
               } else {
-                console.log('No valid news from backend, using RSS fallback');
+                console.log('No valid sports news from backend, using RSS fallback');
+                console.log('Original backend data length:', data.data.length);
+                console.log('Filtered backend data length:', backendNews.length);
               }
             }
           }
@@ -207,14 +291,27 @@ export default function SportsPage() {
         console.log('Using RSS fallback for sports...');
         const newsData = await fetchRSSNews('sports', -1);
         console.log('Received RSS news data:', newsData);
-        setNews(newsData);
-        setAllNews(newsData); // 전체 뉴스 저장
         
-        const totalPages = Math.ceil(newsData.length / articlesPerPage);
+        // RSS 뉴스에서도 고화질 이미지 추출 시도
+        const processedNewsData = newsData.map(article => {
+          // RSS 뉴스에서 description에서 고화질 이미지 찾기
+          const descriptionImageUrl = article.description ? extractFirstImage(article.description) : null;
+          const highQualityImageUrl = descriptionImageUrl || article.imageUrl || '/image/news.webp';
+          
+          return {
+            ...article,
+            imageUrl: highQualityImageUrl
+          };
+        });
+        
+        setNews(processedNewsData);
+        setAllNews(processedNewsData); // 전체 뉴스 저장
+        
+        const totalPages = Math.ceil(processedNewsData.length / articlesPerPage);
         setTotalPages(totalPages);
         setCurrentPage(1);
         
-        saveArticlesToStorage(newsData);
+        saveArticlesToStorage(processedNewsData);
       } catch (error) {
         console.error('Error in loadNews:', error);
       }
@@ -603,7 +700,7 @@ export default function SportsPage() {
                               {article.title}
                             </h3>
                             <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
-                              {article.description}
+                              {createNewsPreview(article)}
                             </p>
                             <div className="flex justify-between items-center pt-3 border-t border-gray-100">
                               <div className="flex items-center space-x-2">
@@ -766,7 +863,7 @@ export default function SportsPage() {
                               {article.title}
                             </h4>
                             <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                              {article.description}
+                              {createNewsPreview(article)}
                             </p>
                             <div className="flex items-center justify-between text-xs text-gray-500">
                               <span>{article.source}</span>

@@ -224,7 +224,7 @@ export default function Footer() {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">서비스</h3>
             <ul className="space-y-2">
               <li><Link href="/customer" className="text-sm text-gray-600 hover:text-[#e53e3e] transition-colors">고객센터</Link></li>
-              <li><Link href="/customer" className="text-sm text-gray-600 hover:text-[#e53e3e] transition-colors">문의하기</Link></li>
+              <li><Link href="/mypage" className="text-sm text-gray-600 hover:text-[#e53e3e] transition-colors">MY 뉴스</Link></li>
               <li><Link href="/column" className="text-sm text-gray-600 hover:text-[#e53e3e] transition-colors">칼럼</Link></li>
             </ul>
           </div>

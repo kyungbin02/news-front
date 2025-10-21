@@ -384,3 +384,23 @@ body {
     transparent 100%);
   pointer-events: none;
 }
+
+/* 뉴스 본문 스타일: 광고 제거로 생긴 빈 공간 정리 */
+.news-content p:empty,
+.news-content div:empty {
+  display: none;
+}
+
+.news-content br + br {
+  display: none;
+}
+
+.news-content p {
+  margin-bottom: 1rem;
+}
+
+.news-content img {
+  margin: 1.5rem 0;
+  max-width: 100%;
+  height: auto;
+}

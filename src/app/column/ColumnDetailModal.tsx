@@ -250,12 +250,19 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
       userId: column.user_id
     });
     
+    // user_id가 없으면 신고 불가
+    if (!column.user_id) {
+      alert('작성자 정보를 찾을 수 없습니다. 신고할 수 없습니다.');
+      console.error('❌ user_id가 없음:', column);
+      return;
+    }
+    
     setSelectedTargetForReport({
       type: 'board',
       id: column.id,
       title: column.title,
       content: column.content,
-      userId: column.user_id || 1 // 임시로 기본값 설정
+      userId: column.user_id
     });
     setShowReportModal(true);
   };
@@ -295,7 +302,7 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
         report_reason: selectedReportReason,
         report_content: reportAdditionalComment || '',
         target_type: selectedTargetForReport.type === 'board' ? 'board' : 'board_comment',
-        target_id: selectedTargetForReport.type === 'board' ? selectedTargetForReport.id : columnId, // 게시물인 경우 게시물 ID, 댓글인 경우 게시물 ID
+        target_id: selectedTargetForReport.id, // 게시물인 경우 게시물 ID, 댓글인 경우 댓글 ID
         comment_id: selectedTargetForReport.type === 'comment' ? selectedTargetForReport.id : null, // 댓글인 경우 댓글 ID
         target_title: selectedTargetForReport.title || selectedTargetForReport.content, // 게시글 제목 또는 댓글 내용
         target_content: selectedTargetForReport.content // 게시글/댓글 내용
@@ -1059,12 +1066,14 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
           image_url: data.image_url ? transformImageUrl(data.image_url) : undefined,
           imageUrls: data.imageUrls ? (Array.isArray(data.imageUrls) ? data.imageUrls.join(',') : data.imageUrls).split(',').map(transformImageUrl).join(',') : undefined,
           isLiked: isLiked, // 임시 해결책으로 가져온 좋아요 상태 사용
-          commentList: commentList // 댓글 목록 추가
+          commentList: commentList, // 댓글 목록 추가
+          user_id: data.user_id || data.userId // 작성자 ID 추가 (신고에 필요)
         };
         
         console.log('🏗️ columnDetail 객체 생성 완료:', columnDetail);
         console.log('🏗️ commentList 포함 여부:', !!columnDetail.commentList);
         console.log('🏗️ commentList 길이:', columnDetail.commentList?.length || 0);
+        console.log('👤 작성자 ID (user_id):', columnDetail.user_id);
         
         setColumn(columnDetail);
       } else {
@@ -1542,7 +1551,7 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
 
       {/* 신고 모달 */}
       {showReportModal && selectedTargetForReport && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">

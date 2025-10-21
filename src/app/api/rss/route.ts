@@ -45,6 +45,7 @@ interface RSSArticle {
   title: string;
   description: string;
   link: string;
+  url?: string; // 원문 URL
   pubDate: string;
   source: string;
   category: string;
@@ -74,38 +75,20 @@ function parseRSSItem(item: any, source: string, category: string): RSSArticle {
   const link = item.link?.[0] || '';
   const pubDate = item.pubDate?.[0] || new Date().toISOString();
   
-  // 이미지 URL 추출 (여러 방식 시도 - 개선된 버전)
+  // 이미지 URL 추출 (여러 방식 시도 - 고화질 우선)
   let imageUrl = '';
   
   try {
-    // 1. enclosure 태그에서 이미지 찾기
-    if (item.enclosure && item.enclosure[0] && item.enclosure[0].$.url) {
-      const enclosureUrl = item.enclosure[0].$.url;
-      if (enclosureUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) {
-        imageUrl = enclosureUrl;
+    // 1. content:encoded에서 이미지 찾기 (본문에 고화질 이미지가 있을 가능성 높음)
+    if (item['content:encoded']) {
+      const content = item['content:encoded'][0] || '';
+      const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
+      if (imgMatch) {
+        imageUrl = imgMatch[1];
       }
     }
     
-    // 2. media:content에서 이미지 찾기
-    if (!imageUrl && item['media:content']) {
-      const mediaContent = Array.isArray(item['media:content']) ? item['media:content'][0] : item['media:content'];
-      if (mediaContent && mediaContent.$ && mediaContent.$.url) {
-        const mediaUrl = mediaContent.$.url;
-        if (mediaUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) || mediaContent.$.type?.includes('image')) {
-          imageUrl = mediaUrl;
-        }
-      }
-    }
-    
-    // 3. media:thumbnail에서 이미지 찾기
-    if (!imageUrl && item['media:thumbnail']) {
-      const mediaThumbnail = Array.isArray(item['media:thumbnail']) ? item['media:thumbnail'][0] : item['media:thumbnail'];
-      if (mediaThumbnail && mediaThumbnail.$ && mediaThumbnail.$.url) {
-        imageUrl = mediaThumbnail.$.url;
-      }
-    }
-    
-    // 4. description에서 img 태그 추출 (개선된 정규식)
+    // 2. description에서 img 태그 추출 (개선된 정규식)
     if (!imageUrl && description) {
       const imgMatches = [
         description.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i),
@@ -121,12 +104,30 @@ function parseRSSItem(item: any, source: string, category: string): RSSArticle {
       }
     }
     
-    // 5. content:encoded에서 이미지 찾기
-    if (!imageUrl && item['content:encoded']) {
-      const content = item['content:encoded'][0] || '';
-      const imgMatch = content.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/i);
-      if (imgMatch) {
-        imageUrl = imgMatch[1];
+    // 3. enclosure 태그에서 이미지 찾기
+    if (!imageUrl && item.enclosure && item.enclosure[0] && item.enclosure[0].$.url) {
+      const enclosureUrl = item.enclosure[0].$.url;
+      if (enclosureUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i)) {
+        imageUrl = enclosureUrl;
+      }
+    }
+    
+    // 4. media:content에서 이미지 찾기
+    if (!imageUrl && item['media:content']) {
+      const mediaContent = Array.isArray(item['media:content']) ? item['media:content'][0] : item['media:content'];
+      if (mediaContent && mediaContent.$ && mediaContent.$.url) {
+        const mediaUrl = mediaContent.$.url;
+        if (mediaUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/i) || mediaContent.$.type?.includes('image')) {
+          imageUrl = mediaUrl;
+        }
+      }
+    }
+    
+    // 5. media:thumbnail에서 이미지 찾기 (썸네일은 화질이 낮을 수 있음)
+    if (!imageUrl && item['media:thumbnail']) {
+      const mediaThumbnail = Array.isArray(item['media:thumbnail']) ? item['media:thumbnail'][0] : item['media:thumbnail'];
+      if (mediaThumbnail && mediaThumbnail.$ && mediaThumbnail.$.url) {
+        imageUrl = mediaThumbnail.$.url;
       }
     }
     
@@ -172,6 +173,7 @@ function parseRSSItem(item: any, source: string, category: string): RSSArticle {
     title: stripHtml(title),
     description: stripHtml(description).substring(0, 100) + '...', // 100자로 줄임
     link,
+    url: link, // 원문 URL (link와 동일)
     pubDate,
     source,
     category,

@@ -160,18 +160,37 @@ export async function getPopularNewsAsArticles(limit: number = 10): Promise<RSSA
     }
     
     const data = await response.json();
+    console.log('🔥 인기뉴스 API 응답:', data);
     
     if (data.success && data.data) {
-      return data.data.map((item: any) => ({
-        id: item.newsId.toString(),
-        title: item.title,
-        description: item.content || '',
-        link: `/news/${item.newsId}`,
-        category: item.category || 'general',
-        source: item.source || 'Backend News',
-        imageUrl: item.imageUrl || '',
-        pubDate: item.createdAt || new Date().toISOString()
-      }));
+      return data.data.map((item: any, index: number) => {
+        console.log(`📰 인기뉴스 ${index + 1}번째 아이템:`, item);
+        
+        // 제목 필드명 확인 (newsTitle 또는 title)
+        const title = item.newsTitle || item.title || `뉴스 #${item.newsId}`;
+        console.log(`📝 제목: "${title}"`);
+        
+        // 이미지 URL 처리
+        let imageUrl = item.imageUrl || '/image/news.webp';
+        console.log(`🖼️ 원본 이미지 URL: "${item.imageUrl}"`);
+        
+        // 이미지 URL이 비어있거나 잘못된 경우 기본 이미지 사용
+        if (!imageUrl || imageUrl === '' || imageUrl === 'null') {
+          imageUrl = '/image/news.webp';
+        }
+        console.log(`🖼️ 최종 이미지 URL: "${imageUrl}"`);
+        
+        return {
+          id: item.newsId.toString(),
+          title: title,
+          description: item.content || '',
+          link: `/news/${item.newsId}`,
+          category: item.category || 'general',
+          source: item.source || 'Backend News',
+          imageUrl: imageUrl,
+          pubDate: item.createdAt || new Date().toISOString()
+        };
+      });
     }
     
     return [];

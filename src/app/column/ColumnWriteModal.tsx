@@ -177,9 +177,8 @@ export default function ColumnWriteModal({ onClose, onSubmit }: ColumnWriteModal
       // 백엔드에서 요구하는 title 파라미터 추가
       formData.append('title', title);
       
-      // 제목과 내용을 [제목] 내용 형식으로 합쳐서 전송
-      const combinedContent = title ? `[${title}] ${content}` : content;
-      formData.append('content', combinedContent);
+      // 내용만 전송 (제목은 따로 보냄)
+      formData.append('content', content);
       
       // 이미지 파일들을 FormData에 추가
       if (selectedFiles.length > 0) {
@@ -195,7 +194,7 @@ export default function ColumnWriteModal({ onClose, onSubmit }: ColumnWriteModal
       console.log('글작성 API 호출 시작...');
       console.log('FormData 내용:', {
         title: title,
-        content: combinedContent,
+        content: content,
         imagesCount: selectedFiles.length || 0
       });
       
@@ -229,7 +228,7 @@ export default function ColumnWriteModal({ onClose, onSubmit }: ColumnWriteModal
           console.log('서버 응답이 JSON이 아님:', responseData);
         }
         
-        // 부모 목록 즉시 갱신 트리거 (이미지 정보 포함)
+        // 부모 목록 즉시 갱신 트리거
         onSubmit({
           id: newPostId,
           title: title || content.substring(0, 50) + '...',
@@ -239,7 +238,6 @@ export default function ColumnWriteModal({ onClose, onSubmit }: ColumnWriteModal
           comments: 0,
           likes: 0,
           content,
-          imageUrls: selectedImages.length > 0 ? selectedImages.join(',') : undefined,
         });
         onClose();
         alert(responseData || '글이 성공적으로 작성되었습니다!');

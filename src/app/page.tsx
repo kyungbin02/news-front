@@ -57,6 +57,49 @@ export default function Home() {
     return categoryMap[category?.toLowerCase()] || category || '기타';
   };
   
+  // HTML 태그 제거 함수
+  const stripHtml = (html: string): string => {
+    if (!html) return '';
+    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  // 뉴스 미리보기 생성 함수 (상세페이지와 동일한 로직)
+  const createNewsPreview = (article: RSSArticle, fullContent?: string): string => {
+    // description이 있으면 사용
+    if (article.description) {
+      return article.description;
+    }
+    
+    // fullContent가 있으면 텍스트만 추출해서 첫 300자
+    if (fullContent) {
+      const textOnly = fullContent
+        .replace(/<[^>]*>/g, '') // HTML 태그 제거
+        .replace(/&nbsp;/g, ' ') // &nbsp; 제거
+        .replace(/\s+/g, ' ') // 연속 공백 제거
+        .trim();
+      
+      if (textOnly.length > 300) {
+        return textOnly.substring(0, 300) + '...';
+      }
+      return textOnly;
+    }
+    
+    return '기사 미리보기를 불러올 수 없습니다.';
+  };
+
+  // 본문에서 첫 번째 이미지 추출 (상세페이지와 동일한 로직)
+  const extractFirstImage = (html: string): string | null => {
+    if (!html) return null;
+    const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+    return imgMatch ? imgMatch[1] : null;
+  };
+
+  // 고화질 이미지 URL 생성 (상세페이지와 동일한 로직)
+  const getHighQualityImageUrl = (article: RSSArticle, fullContent?: string): string => {
+    const contentImageUrl = fullContent ? extractFirstImage(fullContent) : null;
+    return contentImageUrl || article.imageUrl || '/image/news.webp';
+  };
+  
   // 동적 콘텐츠 상태들
   const [aiAnalysisNews, setAiAnalysisNews] = useState<AIAnalysisItem[]>([]);
   const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
@@ -276,12 +319,27 @@ export default function Home() {
           if (allNewsData.success && allNewsData.data) {
             const foundNews = allNewsData.data.find((item: any) => item.newsId === popularNews.newsId);
             if (foundNews) {
-            return {
-              ...popularNews,
+              // 고화질 이미지 처리 (최신뉴스와 동일한 로직)
+              const article = {
+                id: String(foundNews.newsId),
+                title: foundNews.title,
+                description: foundNews.description || '',
+                link: `/news/${foundNews.newsId}`,
+                category: foundNews.category || '일반',
+                source: foundNews.source || '알 수 없는 출처',
                 imageUrl: foundNews.imageUrl || '/image/news.webp',
+                pubDate: foundNews.createdAt || new Date().toISOString()
+              };
+              
+              const highQualityImageUrl = getHighQualityImageUrl(article, foundNews.content);
+              
+              return {
+                ...popularNews,
+                imageUrl: highQualityImageUrl,
                 description: foundNews.content || popularNews.newsTitle || popularNews.title,
-                source: foundNews.source || '알 수 없는 출처' // 실제 언론사명 사용
-            };
+                source: foundNews.source || '알 수 없는 출처',
+                content: foundNews.content // 고화질 이미지 추출을 위해 추가
+              };
             }
           }
         } catch (detailError) {
@@ -414,7 +472,7 @@ export default function Home() {
       try {
         // 백엔드에서 뉴스 가져오기 (우선 시도)
         try {
-          const response = await fetch('http://localhost:8080/api/news?page=1&size=50', {
+          const response = await fetch('http://localhost:8080/api/news?page=1&size=100', {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             mode: 'cors',
@@ -426,16 +484,30 @@ export default function Home() {
               // 백엔드 데이터를 프론트엔드 형식으로 변환 (유효한 데이터만)
               const backendNews = data.data
                 .filter((news: any) => news.title) // title만 체크 (newsId는 나중에 생성)
-                .map((news: any, index: number) => ({
-                  id: news.newsId ? news.newsId.toString() : `backend-${index}`,
-                  title: news.title,
-                  description: (news.content || '').substring(0, 200) + '...',
-                  link: `/news/${news.newsId || `backend-${index}`}`,
-                  category: news.category || '일반',
-                  source: news.source || '알 수 없는 출처', // 실제 언론사명 사용
-                  imageUrl: news.imageUrl || '/image/news.webp', // 기본 이미지 설정
-                  pubDate: news.createdAt || new Date().toISOString()
-                }));
+                .map((news: any, index: number) => {
+                  const article: RSSArticle = {
+                    id: news.newsId ? news.newsId.toString() : `backend-${index}`,
+                    title: news.title,
+                    description: news.description || '', // 원본 description 사용
+                    link: `/news/${news.newsId || `backend-${index}`}`,
+                    category: news.category || '일반',
+                    source: news.source || '알 수 없는 출처',
+                    imageUrl: news.imageUrl || '/image/news.webp',
+                    pubDate: news.createdAt || new Date().toISOString()
+                  };
+                  
+                  // 미리보기 생성 (상세페이지와 동일한 로직)
+                  const preview = createNewsPreview(article, news.content);
+                  
+                  // 고화질 이미지 URL 생성 (상세페이지와 동일한 로직)
+                  const highQualityImageUrl = getHighQualityImageUrl(article, news.content);
+                  
+                  return {
+                    ...article,
+                    description: preview,
+                    imageUrl: highQualityImageUrl
+                  };
+                });
               
               console.log('Loaded news from backend:', backendNews.length);
               console.log('First news item:', backendNews[0]);
@@ -446,8 +518,8 @@ export default function Home() {
                 setNews(backendNews);
                 setAllNews(backendNews);
                 
-                const totalPages = Math.ceil(backendNews.length / articlesPerPage);
-                setTotalPages(totalPages);
+                // 전체 뉴스를 가져왔으므로 클라이언트에서 페이지네이션 계산
+                setTotalPages(Math.ceil(backendNews.length / articlesPerPage));
                 setCurrentPage(1);
                 
                 saveArticlesToStorage(backendNews);
@@ -554,12 +626,6 @@ export default function Home() {
     };
   }, [loading]); // loading 상태가 변경될 때만 실행
 
-  // 현재 페이지에 표시할 기사들
-  const getCurrentPageArticles = () => {
-    const startIndex = (currentPage - 1) * articlesPerPage;
-    const endIndex = startIndex + articlesPerPage;
-    return filteredNews.slice(startIndex, endIndex);
-  };
 
   
   // 카테고리 탭 변경 핸들러
@@ -573,13 +639,25 @@ export default function Home() {
     setCurrentPage(page);
   };
 
+  // 현재 페이지의 뉴스 가져오기
+  const getCurrentPageArticles = () => {
+    const filteredNews = getFilteredNews();
+    const startIndex = (currentPage - 1) * articlesPerPage;
+    const endIndex = startIndex + articlesPerPage;
+    return filteredNews.slice(startIndex, endIndex);
+  };
+
   // 페이징 컴포넌트
   const Pagination = () => {
     const pages = [];
     const maxVisiblePages = 5;
     
+    // 필터링된 뉴스를 기반으로 총 페이지 수 계산
+    const filteredNews = getFilteredNews();
+    const dynamicTotalPages = Math.ceil(filteredNews.length / articlesPerPage);
+    
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    let endPage = Math.min(dynamicTotalPages, startPage + maxVisiblePages - 1);
     
     if (endPage - startPage + 1 < maxVisiblePages) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
@@ -618,7 +696,7 @@ export default function Home() {
         {/* 다음 페이지 */}
         <button
           onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
+          disabled={currentPage === dynamicTotalPages}
           className="px-3 py-2 rounded-md border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           다음
@@ -1133,16 +1211,6 @@ export default function Home() {
               </div>
 
               
-              {/* 카테고리별 뉴스 개수 표시 */}
-              {!searchKeyword && (
-                <div className="text-center mb-4">
-                  <span className="text-sm text-gray-500">
-                    {newsCategoryTab === 'all' ? '전체' : 
-                     newsCategoryTab === 'economy' ? '경제' :
-                     newsCategoryTab === 'sports' ? '스포츠' : '전체'} 뉴스 {filteredNews.length}개
-                  </span>
-                </div>
-              )}
               
               {searchKeyword && (
                 <div className="mb-6">
@@ -1263,7 +1331,7 @@ export default function Home() {
                         </h3>
                       
                       <p className="text-xs text-gray-600 line-clamp-2 mb-3">
-                        {article.description || "최신 뉴스와 기술 동향을 확인해보세요."}
+                        {createNewsPreview(article) || "최신 뉴스와 기술 동향을 확인해보세요."}
                       </p>
                       
                       <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
@@ -1344,10 +1412,10 @@ export default function Home() {
                       window.location.href = `/news/${mainPopularNews.newsId}`;
                     }}
                   >
-                    <img 
-                      src={mainPopularNews.imageUrl || '/image/news.webp'} 
-                      alt={mainPopularNews.newsTitle}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      <img 
+                        src={mainPopularNews.imageUrl || '/image/news.webp'} 
+                        alt={mainPopularNews.newsTitle}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent group-hover:from-black/30 transition-all duration-300"></div>
                     <div className="absolute top-4 left-4">
@@ -1395,16 +1463,24 @@ export default function Home() {
                       {mainPopularNews.newsTitle}
                     </h1>
                     
-                    <p className="text-gray-600 dark:text-gray-300 text-base leading-relaxed">
-                      {mainPopularNews.description && mainPopularNews.description !== mainPopularNews.newsTitle
-                        ? (mainPopularNews.description.length > 120 
-                            ? mainPopularNews.description.slice(0, 120) + '...'
-                            : mainPopularNews.description)
-                        : (mainPopularNews.newsTitle.length > 120 
+                      <p className="text-gray-600 dark:text-gray-300 text-base leading-relaxed">
+                        {(() => {
+                          // 인기뉴스는 간단한 미리보기만 표시
+                          const description = mainPopularNews.description || '';
+                          const cleanDescription = stripHtml(description);
+                          
+                          if (cleanDescription && cleanDescription !== mainPopularNews.newsTitle) {
+                            return cleanDescription.length > 120 
+                              ? cleanDescription.slice(0, 120) + '...'
+                              : cleanDescription;
+                          }
+                          
+                          // description이 없으면 제목을 미리보기로 사용
+                          return mainPopularNews.newsTitle.length > 120 
                             ? mainPopularNews.newsTitle.slice(0, 120) + '...'
-                            : mainPopularNews.newsTitle)
-                      }
-                    </p>
+                            : mainPopularNews.newsTitle;
+                        })()}
+                      </p>
                     
                     <div className="flex items-center space-x-6 text-sm text-gray-500 dark:text-gray-400">
                       <div className="flex items-center space-x-1">
@@ -1680,7 +1756,7 @@ export default function Home() {
                             {article.title}
                           </h4>
                           <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                            {article.description}
+                            {createNewsPreview(article)}
                           </p>
                           <div className="flex items-center space-x-2 text-xs text-gray-500">
                             <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full">

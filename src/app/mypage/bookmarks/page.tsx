@@ -29,6 +29,22 @@ export default function BookmarksPage() {
     
     return categoryMap[category?.toLowerCase()] || category || '기타';
   };
+
+  // HTML 태그 제거 함수
+  const stripHtml = (html: string): string => {
+    if (!html) return '';
+    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  // 뉴스 미리보기 생성 함수
+  const createNewsPreview = (content: string): string => {
+    if (!content) return '';
+    
+    const cleanContent = stripHtml(content);
+    return cleanContent.length > 150 
+      ? cleanContent.substring(0, 150) + '...'
+      : cleanContent;
+  };
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +143,7 @@ export default function BookmarksPage() {
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              마이페이지로 돌아가기
+              MY 뉴스로 돌아가기
             </Link>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">📖 북마크한 뉴스</h1>
@@ -169,7 +185,7 @@ export default function BookmarksPage() {
                 <div key={bookmark.bookmarkId} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-6">
                     {/* 뉴스 이미지 */}
-                    <div className="w-32 h-32 flex-shrink-0">
+                    <div className="w-48 h-48 flex-shrink-0">
                       <Link href={`/news/${bookmark.newsId}`} className="block">
                         {bookmark.imageUrl ? (
                           <img 
@@ -219,10 +235,7 @@ export default function BookmarksPage() {
                       
                       {bookmark.newsContent && (
                         <p className="text-gray-600 mb-4 line-clamp-3 leading-relaxed">
-                          {bookmark.newsContent.length > 150 
-                            ? `${bookmark.newsContent.substring(0, 150)}...` 
-                            : bookmark.newsContent
-                          }
+                          {createNewsPreview(bookmark.newsContent)}
                         </p>
                       )}
                       
