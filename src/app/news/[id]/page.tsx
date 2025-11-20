@@ -118,7 +118,8 @@ export default function NewsDetailPage({ params }: NewsDetailPageProps) {
       if (isNumericId) {
         console.log('✅ 숫자 ID 확인됨, 백엔드 API 호출 진행');
         try {
-          const apiUrl = `http://localhost:8080/api/news/${id}`;
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+          const apiUrl = `${baseUrl}/api/news/${id}`;
           console.log('🔍 뉴스 상세 API 호출 URL:', apiUrl);
           
           const response = await fetch(apiUrl, {

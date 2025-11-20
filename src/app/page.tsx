@@ -307,14 +307,15 @@ export default function Home() {
   // 인기뉴스 API 호출 함수
   const getMainPopularNews = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/news/popular?limit=1');
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/api/news/popular?limit=1`);
       const data = await response.json();
       if (data.success && data.data.length > 0) {
         const popularNews = data.data[0];
         
         // 최신 뉴스 API에서 해당 뉴스 찾기
         try {
-          const allNewsResponse = await fetch('http://localhost:8080/api/news');
+          const allNewsResponse = await fetch(`${baseUrl}/api/news`);
           const allNewsData = await allNewsResponse.json();
           if (allNewsData.success && allNewsData.data) {
             const foundNews = allNewsData.data.find((item: any) => item.newsId === popularNews.newsId);
@@ -362,7 +363,8 @@ export default function Home() {
 
   const getPopularNewsList = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/news/popular?limit=5');
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/api/news/popular?limit=5`);
       const data = await response.json();
       if (data.success && data.data.length > 0) {
         // 각 뉴스의 실제 출처 정보를 가져와서 매핑
@@ -370,7 +372,7 @@ export default function Home() {
           data.data.map(async (news: any) => {
             try {
               // 최신 뉴스 API에서 해당 뉴스 찾기
-              const allNewsResponse = await fetch('http://localhost:8080/api/news');
+              const allNewsResponse = await fetch(`${baseUrl}/api/news`);
               const allNewsData = await allNewsResponse.json();
               if (allNewsData.success && allNewsData.data) {
                 const foundNews = allNewsData.data.find((item: any) => item.newsId === news.newsId);
@@ -472,7 +474,8 @@ export default function Home() {
       try {
         // 백엔드에서 뉴스 가져오기 (우선 시도)
         try {
-          const response = await fetch('http://localhost:8080/api/news?page=1&size=100', {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+          const response = await fetch(`${baseUrl}/api/news?page=1&size=100`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             mode: 'cors',

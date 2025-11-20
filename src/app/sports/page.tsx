@@ -210,7 +210,8 @@ export default function SportsPage() {
         // 백엔드에서 뉴스 가져오기 (우선 시도)
         try {
           // 스포츠 카테고리로 먼저 시도
-          let response = await fetch('http://localhost:8080/api/news?category=sports&page=1&size=50', {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+          let response = await fetch(`${baseUrl}/api/news?category=sports&page=1&size=50`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             mode: 'cors',
@@ -219,7 +220,7 @@ export default function SportsPage() {
           // 스포츠 카테고리가 없으면 전체 뉴스에서 필터링
           if (!response.ok) {
             console.log('Sports category not found, trying all news...');
-            response = await fetch('http://localhost:8080/api/news?page=1&size=100', {
+            response = await fetch(`${baseUrl}/api/news?page=1&size=100`, {
               method: 'GET',
               headers: { 'Accept': 'application/json' },
               mode: 'cors',

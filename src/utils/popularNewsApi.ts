@@ -38,7 +38,8 @@ export async function trackNewsClick(newsId: string, title: string, category?: s
       console.log(`뉴스 ${newsId} 조회수 추적 API 호출 시작`);
       console.log('전송할 데이터:', requestData);
       
-      const response = await fetch('http://localhost:8080/api/news-click', {
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/api/news-click`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +70,8 @@ export async function trackNewsClick(newsId: string, title: string, category?: s
 // 개별 뉴스 상세 정보 가져오기
 async function getNewsDetails(newsId: number): Promise<{ title: string; category?: string; source?: string; imageUrl?: string } | null> {
   try {
-    const response = await fetch(`http://localhost:8080/api/news/${newsId}`, {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+    const response = await fetch(`${baseUrl}/api/news/${newsId}`, {
       cache: 'no-store',
       mode: 'cors',
     });
@@ -96,7 +98,8 @@ async function getNewsDetails(newsId: number): Promise<{ title: string; category
 // 인기뉴스 TOP 조회
 export async function getPopularNews(limit: number = 10): Promise<PopularNews[]> {
   try {
-    const response = await fetch(`http://localhost:8080/api/news/popular?limit=${limit}`, {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+    const response = await fetch(`${baseUrl}/api/news/popular?limit=${limit}`, {
       cache: 'no-store',
       mode: 'cors',
     });
@@ -150,7 +153,8 @@ export async function getPopularNews(limit: number = 10): Promise<PopularNews[]>
 // 인기뉴스를 RSSArticle 형식으로 변환하여 조회
 export async function getPopularNewsAsArticles(limit: number = 10): Promise<RSSArticle[]> {
   try {
-    const response = await fetch(`http://localhost:8080/api/news/popular?limit=${limit}`, {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+    const response = await fetch(`${baseUrl}/api/news/popular?limit=${limit}`, {
       cache: 'no-store',
       mode: 'cors',
     });
@@ -203,7 +207,8 @@ export async function getPopularNewsAsArticles(limit: number = 10): Promise<RSSA
 // 특정 뉴스의 클릭수 조회
 export async function getNewsClickCount(newsId: string): Promise<number> {
   try {
-    const response = await fetch(`http://localhost:8080/api/news-click/${newsId}`, {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+    const response = await fetch(`${baseUrl}/api/news-click/${newsId}`, {
       cache: 'no-store',
       mode: 'cors',
     });

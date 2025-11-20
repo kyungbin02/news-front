@@ -202,7 +202,8 @@ export default function EconomyPage() {
       try {
         // 백엔드에서 경제 뉴스 가져오기 (우선 시도)
         try {
-          const response = await fetch('http://localhost:8080/api/news?category=economy&page=1&size=100', {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+          const response = await fetch(`${baseUrl}/api/news?category=economy&page=1&size=100`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             mode: 'cors',

@@ -135,7 +135,8 @@ export default function GeneralPage() {
       try {
         try {
           // 백엔드에서 전체 뉴스 가져오기 (단일 API 호출)
-          const response = await fetch('http://localhost:8080/api/news?page=1&size=100', {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+          const response = await fetch(`${baseUrl}/api/news?page=1&size=100`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             mode: 'cors',

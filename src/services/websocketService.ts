@@ -4,6 +4,8 @@ import { getToken } from '@/utils/token';
 import { getUserIdFromToken, isAdminFromToken } from '@/utils/jwt';
 import { Notification } from '@/types/notification';
 
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+
 class WebSocketService {
   private stompClient: Client | null = null;
   private isConnected = false;
@@ -103,7 +105,8 @@ class WebSocketService {
       }
 
       // JWT 토큰을 쿼리 파라미터로 전달
-      const socketUrl = `ws://localhost:8080/ws?token=${encodeURIComponent(token)}`;
+      // SockJS는 http:// 또는 https://를 사용 (ws://가 아님)
+      const socketUrl = `${baseUrl}/ws?token=${encodeURIComponent(token)}`;
       const socket = new SockJS(socketUrl);
       
       // 새로운 소켓으로 클라이언트 재생성

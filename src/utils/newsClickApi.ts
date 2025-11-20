@@ -39,7 +39,8 @@ export async function trackNewsClick(newsId: string, newsTitle: string): Promise
     
     console.log(`뉴스 클릭 추적: ${newsTitle} (ID: ${numericId})`);
     
-    const response = await fetch('http://localhost:8080/api/news-click', {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+    const response = await fetch(`${baseUrl}/api/news-click`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

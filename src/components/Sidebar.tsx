@@ -38,7 +38,8 @@ export default function Sidebar() {
   // 인기뉴스 로드
   const loadPopularNews = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/news/popular?limit=4');
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+      const response = await fetch(`${baseUrl}/api/news/popular?limit=4`);
       const data = await response.json();
       console.log('인기뉴스 API 응답:', data);
       if (data.success && data.data.length > 0) {

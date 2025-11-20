@@ -111,7 +111,8 @@ export default function ITPage() {
       setLoading(true);
       try {
         try {
-          const response = await fetch('http://localhost:8080/api/news?category=it&page=1&size=50', {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
+          const response = await fetch(`${baseUrl}/api/news?category=it&page=1&size=50`, {
             method: 'GET',
             headers: { 'Accept': 'application/json' },
             mode: 'cors',
