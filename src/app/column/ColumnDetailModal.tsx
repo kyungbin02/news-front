@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { getToken, removeToken } from '@/utils/token';
 import { parseTitleAndContent } from '@/utils/articleStorage';
-import ImageGallery from '@/components/ImageGallery';
 
 interface ColumnDetail {
   id: number;
@@ -61,6 +60,23 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
   } | null>(null);
   const [selectedReportReason, setSelectedReportReason] = useState('');
   const [reportAdditionalComment, setReportAdditionalComment] = useState('');
+
+  // 이미지 표시용 상태 (작성 모달과 유사한 UX를 위해 추가)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // 날짜/시간 포맷 함수 (댓글/대댓글 공통 사용)
+  const formatDateTime = (value?: string) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value;
+    // 예: 2025-01-02 13:45
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hour = String(date.getHours()).padStart(2, '0');
+    const minute = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hour}:${minute}`;
+  };
 
   // 액션 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -849,8 +865,32 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
     if (isOpen && columnId) {
       loadColumnDetail();
       loadCurrentUser();
+      setCurrentImageIndex(0);
     }
   }, [isOpen, columnId]);
+
+  // 키보드 좌우 화살표로 이미지 이동 (작성 모달과 동일한 UX)
+  useEffect(() => {
+    const imageUrlString = column?.imageUrls || column?.image_url || '';
+    const images = imageUrlString
+      ? imageUrlString.split(',').map(url => url.trim()).filter(Boolean)
+      : [];
+
+    if (images.length <= 1) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setCurrentImageIndex(prev => prev > 0 ? prev - 1 : images.length - 1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setCurrentImageIndex(prev => prev < images.length - 1 ? prev + 1 : 0);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [column?.imageUrls, column?.image_url]);
 
   const loadColumnDetail = async () => {
     if (!columnId) return;
@@ -858,7 +898,7 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
     setLoading(true);
     try {
       const token = getToken();
-      const baseUrl = 'http://localhost:8080';
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:8080';
       
       console.log('상세 정보 로드 시작 - columnId:', columnId);
       console.log('토큰 상태:', token ? '있음' : '없음');
@@ -1115,27 +1155,103 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
       <div className={`bg-white/95 w-full max-w-7xl h-[90vh] flex overflow-hidden transform transition-all duration-500 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
-        {/* 왼쪽: 이미지 섹션 */}
-        <div className="w-3/5 h-full overflow-hidden" style={{ position: 'relative' }}>
-          {(column?.imageUrls || column?.image_url) ? (
-            <div className="w-full h-full" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-              <ImageGallery imageUrl={column.imageUrls || column.image_url || ''} size="large" />
-            </div>
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-              <div className="text-white text-center">
-                <svg className="w-20 h-20 mx-auto mb-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-xl font-medium">이미지 없음</p>
-                <p className="text-sm text-gray-400 mt-2">칼럼 이미지가 없습니다</p>
+        {/* 왼쪽: 이미지 섹션 (칼럼 작성 모달과 동일한 스타일) */}
+        <div className="w-1/2 h-full bg-gradient-to-br from-gray-50 to-gray-100 relative">
+          {(() => {
+            const imageUrlString = column?.imageUrls || column?.image_url || '';
+            const images = imageUrlString
+              ? imageUrlString.split(',').map(url => url.trim()).filter(Boolean)
+              : [];
+
+            if (images.length > 0) {
+              return (
+                <div className="w-full h-full relative bg-gray-900 flex items-center justify-center">
+                  <img
+                    src={images[currentImageIndex]}
+                    alt="칼럼 이미지"
+                    className="max-w-full max-h-full object-contain"
+                    style={{
+                      width: 'auto',
+                      height: 'auto',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                    }}
+                  />
+
+                  {/* 이미지 네비게이션 */}
+                  {images.length > 1 && (
+                    <>
+                      {/* 이전 버튼 */}
+                      <button
+                        onClick={() =>
+                          setCurrentImageIndex(prev =>
+                            prev > 0 ? prev - 1 : images.length - 1
+                          )
+                        }
+                        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/80 text-gray-700 p-2 rounded-full hover:bg-white shadow-md hover:shadow-lg transition-colors"
+                        title="이전 이미지"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+
+                      {/* 다음 버튼 */}
+                      <button
+                        onClick={() =>
+                          setCurrentImageIndex(prev =>
+                            prev < images.length - 1 ? prev + 1 : 0
+                          )
+                        }
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/80 text-gray-700 p-2 rounded-full hover:bg-white shadow-md hover:shadow-lg transition-colors"
+                        title="다음 이미지"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+
+                      {/* 이미지 인디케이터 */}
+                      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2">
+                        {images.map((_, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setCurrentImageIndex(index)}
+                            className={`w-2 h-2 rounded-full transition-colors ${
+                              index === currentImageIndex ? 'bg-blue-600' : 'bg-gray-400'
+                            }`}
+                            title={`${index + 1}번째 이미지`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* 이미지 개수 표시 (작성 모달과 유사하되, 추가 버튼은 없음) */}
+                  <div className="absolute bottom-4 left-4 bg-white/90 text-gray-700 text-sm px-3 py-1 rounded-full flex items-center space-x-2 shadow-md">
+                    <span>{currentImageIndex + 1}/{images.length}장</span>
+                  </div>
+                </div>
+              );
+            }
+
+            // 이미지가 없을 때
+            return (
+              <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                <div className="text-white text-center">
+                  <svg className="w-20 h-20 mx-auto mb-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-xl font-medium">이미지 없음</p>
+                  <p className="text-sm text-gray-400 mt-2">칼럼 이미지가 없습니다</p>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* 오른쪽: 상세 섹션 */}
-        <div className="w-2/5 flex flex-col rounded-r-lg overflow-hidden bg-white">
+        <div className="w-1/2 flex flex-col rounded-r-lg overflow-hidden bg-white">
           {/* 작성자/닫기/제목/통계 - 댓글 모달 상단과 유사 */}
           <div className="border-b border-gray-200 p-4">
             <div className="flex items-center justify-between">
@@ -1280,7 +1396,7 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
                           <div className="flex items-center space-x-3">
                             <span className="font-semibold text-gray-900">{comment.username}</span>
                             <span className="text-sm text-gray-500">
-                              {new Date(comment.uploaded_at).toLocaleDateString()}
+                              {formatDateTime(comment.uploaded_at)}
                             </span>
                           </div>
                           
@@ -1444,7 +1560,7 @@ export default function ColumnDetailModal({ isOpen, onClose, columnId, onLikeCha
                                   <div className="flex items-center space-x-3">
                                     <span className="text-sm font-semibold text-gray-900">{reply.username}</span>
                                     <span className="text-xs text-gray-500">
-                                      {new Date(reply.uploaded_at).toLocaleDateString()}
+                                      {formatDateTime(reply.uploaded_at)}
                                     </span>
                                   </div>
                                   

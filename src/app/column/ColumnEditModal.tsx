@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { getToken } from '@/utils/token';
-import ImageGallery from '@/components/ImageGallery';
 import { parseTitleAndContent } from '@/utils/articleStorage';
 
 export interface ColumnEditData {
@@ -27,6 +26,7 @@ export default function ColumnEditModal({ isOpen, onClose, column, onUpdated }: 
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
   const [submitting, setSubmitting] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   // 이미지 업로드 관련 상태
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -60,7 +60,37 @@ export default function ColumnEditModal({ isOpen, onClose, column, onUpdated }: 
     const { title: newTitle, content: newContent } = parseTitleAndContent(column.content);
     setTitle(newTitle);
     setContent(newContent);
+    setCurrentImageIndex(0);
   }, [column]);
+
+  // 현재 수정 모달에서 보여줄 전체 이미지 목록 (기존 + 새로 추가된 이미지)
+  const getAllImages = () => {
+    const imageUrlString = column?.imageUrls || column?.image_url || '';
+    const baseImages = imageUrlString
+      ? imageUrlString.split(',').map(url => url.trim()).filter(Boolean)
+      : [];
+    return [...baseImages, ...selectedImages];
+  };
+
+  // 좌우 방향키로 이미지 이동 (작성/디테일 모달과 유사한 UX)
+  useEffect(() => {
+    const images = getAllImages();
+    if (images.length <= 1) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setCurrentImageIndex(prev => prev > 0 ? prev - 1 : images.length - 1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setCurrentImageIndex(prev => prev < images.length - 1 ? prev + 1 : 0);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [column.imageUrls, column.image_url, selectedImages.length]);
 
   if (!isOpen) return null;
 
@@ -190,22 +220,102 @@ export default function ColumnEditModal({ isOpen, onClose, column, onUpdated }: 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
       <div className="bg-white/95 rounded-lg w-full max-w-7xl h-[90vh] flex overflow-hidden">
-        {/* 왼쪽: 이미지 표시 영역 */}
-        <div className="w-1/2 bg-gray-100 flex items-center justify-center">
-          {(column?.imageUrls || column?.image_url) ? (
-            <ImageGallery 
-              imageUrl={column.imageUrls || column.image_url || ''} 
-              size="large" 
-            />
-          ) : (
-            <div className="text-center text-gray-500">
-              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <p className="text-lg font-medium">이미지 없음</p>
-              <p className="text-sm">이미지를 추가해보세요</p>
-            </div>
-          )}
+        {/* 왼쪽: 이미지 표시 영역 (작성/디테일 모달과 동일 스타일) */}
+        <div className="w-1/2 h-full bg-gradient-to-br from-gray-50 to-gray-100 relative">
+          {(() => {
+            const images = getAllImages();
+
+            if (images.length > 0) {
+              const safeIndex = Math.min(currentImageIndex, images.length - 1);
+              const currentImage = images[safeIndex];
+
+              return (
+                <div className="w-full h-full relative bg-gray-900 flex items-center justify-center">
+                  <img
+                    src={currentImage}
+                    alt="칼럼 이미지"
+                    className="max-w-full max-h-full object-contain"
+                    style={{
+                      width: 'auto',
+                      height: 'auto',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                    }}
+                  />
+
+                  {/* 이미지 네비게이션 */}
+                  {images.length > 1 && (
+                    <>
+                      {/* 이전 버튼 */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentImageIndex(prev =>
+                            prev > 0 ? prev - 1 : images.length - 1
+                          )
+                        }
+                        className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white/80 text-gray-700 p-2 rounded-full hover:bg-white shadow-md hover:shadow-lg transition-colors"
+                        title="이전 이미지"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+
+                      {/* 다음 버튼 */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCurrentImageIndex(prev =>
+                            prev < images.length - 1 ? prev + 1 : 0
+                          )
+                        }
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-white/80 text-gray-700 p-2 rounded-full hover:bg-white shadow-md hover:shadow-lg transition-colors"
+                        title="다음 이미지"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+
+                      {/* 이미지 인디케이터 */}
+                      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex space-x-2">
+                        {images.map((_, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => setCurrentImageIndex(index)}
+                            className={`w-2 h-2 rounded-full transition-colors ${
+                              index === safeIndex ? 'bg-blue-600' : 'bg-gray-400'
+                            }`}
+                            title={`${index + 1}번째 이미지`}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* 이미지 개수 표시 */}
+                  <div className="absolute bottom-4 left-4 bg-white/90 text-gray-700 text-sm px-3 py-1 rounded-full flex items-center space-x-2 shadow-md">
+                    <span>{safeIndex + 1}/{images.length}장</span>
+                  </div>
+                </div>
+              );
+            }
+
+            // 이미지가 없을 때
+            return (
+              <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                <div className="text-white text-center">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-lg font-medium">이미지 없음</p>
+                  <p className="text-sm text-gray-300 mt-1">이미지를 추가해보세요</p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* 오른쪽: 수정 폼 */}
